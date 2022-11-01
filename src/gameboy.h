@@ -53,7 +53,17 @@ private:
     // CONTROL FLOW instructions
 
     void jumpNN(uint16_t);
-    
+    void jumpHL(uint16_t);
+    void jumpCCNN(uint16_t, uint16_t);
+    void jumprE(uint8_t);
+    void jumprCCE(uint16_t, uint8_t);
+    void callNN(uint16_t);
+    void callCCNN(uint16_t, uint16_t);
+    void ret();
+    void retNN(uint16_t);
+    void retCC(uint16_t);
+    void reti();
+    void rstN(uint8_t);
 
     // END CONTROL FLOW instructions
 

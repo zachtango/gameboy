@@ -149,3 +149,150 @@ void Gameboy::popRR(uint16_t RR){
     sp += 1;
 }
 
+// CONTROL FLOW instructions
+
+void Gameboy::jumpNN(uint16_t NN){
+    // opcode 0xC3
+    pc = NN;
+}
+
+void Gameboy::jumpHL(uint16_t HL){
+    // opcode 0xe9
+    pc = R[HL];
+}
+
+void Gameboy::jumpCCNN(uint16_t CC, uint16_t NN){
+    // opcode 0xC2 0xD2 0xCA 0xDA
+
+    bool flag;
+    // CC IN THE OPCODE
+    switch(CC){
+        case 0x00:  // NZ
+            // flag =
+            break;
+        case 0x01:  // Z
+            break;
+        case 0x02:  // NC
+            break;
+        case 0x03:  // C
+    }
+
+    if(flag){
+        pc = NN;
+    }
+}
+
+void Gameboy::jumprE(uint8_t E){
+    // opcode 0x18
+    pc += E;
+}
+
+void Gameboy::jumprCCE(uint16_t CC, uint8_t E){
+    // opcode 0x20 0x30 0x28 0x38
+    bool flag;
+    // CC IN THE OPCODE
+    switch(CC){
+        case 0x00:  // NZ
+            // flag =
+            break;
+        case 0x01:  // Z
+            break;
+        case 0x02:  // NC
+            break;
+        case 0x03:  // C
+    }
+
+    if(flag){
+        pc += E;
+    }
+}
+
+void Gameboy::callNN(uint16_t NN){
+    // opcode 0xCD
+    sp -= 1;
+    M[sp] = 0x0F & NN;
+    
+    sp -= 1;
+    M[sp] = 0xF0 & NN;
+
+    pc = NN;
+}
+
+void Gameboy::callCCNN(uint16_t CC, uint16_t NN){
+    // opcode 0xC4 0xD4 0xCC 0xDC
+
+    bool flag;
+
+    switch(CC){
+
+    }
+
+    if(flag){
+        sp -= 1;
+        M[sp] = 0x0F & NN;
+        
+        sp -= 1;
+        M[sp] = 0xF0 & NN;
+
+        pc = NN;
+    }
+}
+
+void Gameboy::ret(){
+    // opcode 0xC9
+    uint8_t lsb = M[sp];
+    sp += 1;
+
+    pc = (lsb << 8u) | M[sp];
+    sp += 1;
+}
+
+void Gameboy::retCC(uint16_t CC){
+    // opcode 0xC0 0xD0 0xC8 0xD8
+
+    bool flag;
+
+    switch(CC){
+
+    }
+
+    if(flag){
+        uint8_t lsb = M[sp];
+        sp += 1;
+
+        pc = (lsb << 8u) | M[sp];
+        sp += 1;
+    }
+}
+
+void Gameboy::reti(){
+    // opcode 0xD9
+    // interrupts by setting IME = 1
+
+    uint8_t lsb = M[sp];
+    sp += 1;
+
+    pc = (lsb << 8u) | M[sp];
+    sp += 1;
+
+    // IME = 1;
+}
+
+void Gameboy::rstN(uint8_t N){
+    // opcode 0xC7 0xD7 0xE7 0xF7 0xCF 0xDF 0xEF 0xFF
+    
+    sp -= 1;
+    M[sp] = 0xF0 & pc;
+
+    sp -= 1;
+    M[sp] = 0x0F & pc;
+
+    pc = N;
+}
+
+// MISC instructions
+
+
+
+
+// END MISC instructions
