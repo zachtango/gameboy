@@ -14,9 +14,11 @@ private:
     
     uint8_t M[MEMORY_SIZE];
     uint8_t R[REGISTERS_SIZE];
-    uint8_t sp;
-    uint8_t pc;
-    uint8_t opcode;
+    uint8_t sp; // points to top of stack in memory
+    uint16_t pc; // index value of current instruction in memory arr
+    uint8_t opcode; // M[pc]
+
+    // LOAD instructions
 
     // 8 bit
     void loadRR(uint8_t, uint8_t); // Load to the 8-bit register r, the immediate data n
@@ -46,5 +48,13 @@ private:
     void pushRR(uint16_t);
     void popRR(uint16_t);
 
+    // END LOAD instructions
+
+    // CONTROL FLOW instructions
+
+    void jumpNN(uint16_t);
+    
+
+    // END CONTROL FLOW instructions
 
 };

@@ -133,18 +133,19 @@ void Gameboy::loadSPHL(uint16_t HL){
 
 void Gameboy::pushRR(uint16_t RR){
     // opcode 0xC5
-    sp += 1;
+    sp -= 1;
     M[sp] = R[0xF0 & RR];
     
-    sp += 1;
+    sp -= 1;
     M[sp] = R[0x0F & RR];
 }
 
 void Gameboy::popRR(uint16_t RR){
     // opcode 0xC1
     R[0x0F & RR] = M[sp];
-    sp -= 1;
+    sp += 1;
 
     R[0xF0 & RR] = M[sp];
-    sp -= 1;
+    sp += 1;
 }
+
