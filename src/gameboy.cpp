@@ -6,6 +6,8 @@
 
 // LOAD Instructions
 
+// 8 bit load instructions
+
 void Gameboy::loadRR(uint8_t r1, uint8_t r2){
     // opcode 0x41
     R[r1] = R[r2];
@@ -80,4 +82,69 @@ void Gameboy::loadhAN(uint8_t A, uint8_t N){
 void Gameboy::loadhNA(uint8_t N, uint8_t A){
     // opcode 0xE0
     M[0xFF00 | N] = R[A];
+}
+
+void Gameboy::loaddAHL(uint8_t A, uint16_t HL){
+    // opcode 0x3A
+    R[A] = R[HL];
+
+    R[HL] -= 1;
+}
+
+void Gameboy::loaddHLA(uint16_t HL, uint8_t A){
+    // opcode 0x32
+    R[HL] = R[A];
+
+    R[HL] -= 1;
+}
+
+void Gameboy::loadiAHL(uint8_t A, uint16_t HL){
+    // opcode 0x2A
+    R[A] = R[HL];
+
+    R[HL] += 1;
+}
+
+void Gameboy::loadiHLA(uint16_t HL, uint8_t A){
+    // opcode 0x22
+    R[HL] = R[A];
+
+    R[HL] += 1;
+}
+
+// 16 bit load instructions
+
+void Gameboy::loadRRNN(uint16_t RR, uint16_t NN){
+    // opcode 0x01
+    R[0xF0 & RR] = 0xF0 & NN;
+    R[0x0F & RR] = 0x0F & NN;
+}
+
+void Gameboy::loadNNSP(uint16_t NN){
+    // opcode 0x08
+    M[NN] = 0xF0 & sp;
+    M[NN + 1] = 0x0F & sp;
+}
+
+void Gameboy::loadSPHL(uint16_t HL){
+    // opcode 0xF9
+    sp = R[HL];
+}
+
+void Gameboy::pushRR(uint16_t RR){
+    // opcode 0xC5
+    sp += 1;
+    M[sp] = R[0xF0 & RR];
+    
+    sp += 1;
+    M[sp] = R[0x0F & RR];
+}
+
+void Gameboy::popRR(uint16_t RR){
+    // opcode 0xC1
+    R[0x0F & RR] = M[sp];
+    sp -= 1;
+
+    R[0xF0 & RR] = M[sp];
+    sp -= 1;
 }

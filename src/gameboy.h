@@ -18,6 +18,7 @@ private:
     uint8_t pc;
     uint8_t opcode;
 
+    // 8 bit
     void loadRR(uint8_t, uint8_t); // Load to the 8-bit register r, the immediate data n
     void loadRN(uint8_t, uint8_t); // Load to the 8-bit register r, data from the absolute address specified by the 16-bit register HL
     void loadRHL(uint8_t, uint16_t); // Load to the absolute address specified by the 16-bit register HL, data from the 8-bit register r
@@ -33,5 +34,17 @@ private:
     void loadhCA(uint8_t, uint8_t); // Load to the address specified by the 8-bit C register, data from the 8-bit A register. The full 16-bit absolute address is obtained by setting the most significant byte to 0xFF and the least significant byte to the value of C, so the possible range is 0xFF00-0xFFFF
     void loadhAN(uint8_t, uint8_t); // Load to the 8-bit A register, data from the address specified by the 8-bit immediate data n. The full 16-bit absolute address is obtained by setting the most significant byte to 0xFF and the least significant byte to the value of n, so the possible range is 0xFF00-0xFFFF.
     void loadhNA(uint8_t, uint8_t); // Load to the address specified by the 8-bit immediate data n, data from the 8-bit A register. The full 16-bit absolute address is obtained by setting the most significant byte to 0xFF and the least significant byte to the value of n, so the possible range is 0xFF00-0xFFFF.
+    void loaddAHL(uint8_t, uint16_t);
+    void loaddHLA(uint16_t, uint8_t);
+    void loadiHLA(uint16_t, uint8_t);
+    void loadiAHL(uint8_t, uint16_t);
+
+    // 16 bit
+    void loadRRNN(uint16_t, uint16_t);
+    void loadNNSP(uint16_t);
+    void loadSPHL(uint16_t);
+    void pushRR(uint16_t);
+    void popRR(uint16_t);
+
 
 };
