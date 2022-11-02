@@ -1,40 +1,4 @@
-
 #include <gameboy.h>
-
-uint8_t *Gameboy::register8(uint8_t r){
-    /*
-        r8 table is
-        0 B
-        1 C
-        2 D
-        3 E
-        4 H
-        5 L
-        6 (HL)
-        7 A
-    */
-
-    switch(r){
-        case 0:
-            return &R[B];
-        case 1:
-            return &R[C];
-        case 2:
-            return &R[D];
-        case 3:
-            return &R[E];
-        case 4:
-            return &R[H];
-        case 5:
-            return &R[L];
-        // case 6:
-        //     return &M[ (R[H] << 8u) | R[L] ];
-        case 7:
-            return &R[A];
-    }
-
-    return nullptr;
-}
 
 void Gameboy::step(){
     // update timer
@@ -614,13 +578,108 @@ uint8_t Gameboy::dec_hl(){
 }
 
 uint8_t Gameboy::daa(){
+
+
     return 4;
 }
 
 uint8_t Gameboy::cpl(){
 
+    R[A] ^= 0xFF; // complement A
+
     return 4;
 }
+
+// 16 bit arithmetic
+uint8_t Gameboy::add_hlrr(){
+        
+    // rr may be BC = 0 DE = 1 HL = 2 SP = 3
+    uint16_t rr;
+
+    switch(opcode >> 4u){
+        case 0:
+            rr = (R[B] << 8u) | R[C];
+        case 1:
+            rr = (R[D] << 8u) | R[E];
+        case 2:
+            rr = (R[H] << 8u) | R[L];
+        case 3:
+            rr = sp;
+    }
+
+    uint16_t hl = (R[H] << 8u) | R[L];
+
+    hl += rr;
+
+    R[H] = hl >> 8u;
+    R[L] = (uint8_t) hl;
+
+    return 8;
+}
+
+uint8_t Gameboy::inc_rr(){
+
+    // rr may be BC = 0 DE = 1 HL = 2 SP = 3
+    uint16_t rr;
+
+    switch(opcode >> 4u){
+        case 0:
+            rr = (R[B] << 8u) | R[C];
+            rr += 1;
+
+            R[B] = rr >> 8u;
+            R[C] = (uint8_t) rr;
+        case 1:
+            rr = (R[D] << 8u) | R[E];
+            rr += 1;
+
+            R[D] = rr >> 8u;
+            R[E] = (uint8_t) rr;
+        case 2:
+            rr = (R[H] << 8u) | R[L];
+            rr += 1;
+
+            R[H] = rr >> 8u;
+            R[L] = (uint8_t) rr;
+        case 3:
+            sp += 1;
+    }
+
+    return 8;
+}
+
+uint8_t Gameboy::dec_rr(){
+
+    // rr may be BC = 0 DE = 1 HL = 2 SP = 3
+    uint16_t rr;
+
+    switch(opcode >> 4u){
+        case 0:
+            rr = (R[B] << 8u) | R[C];
+            rr -= 1;
+
+            R[B] = rr >> 8u;
+            R[C] = (uint8_t) rr;
+        case 1:
+            rr = (R[D] << 8u) | R[E];
+            rr -= 1;
+
+            R[D] = rr >> 8u;
+            R[E] = (uint8_t) rr;
+        case 2:
+            rr = (R[H] << 8u) | R[L];
+            rr -= 1;
+
+            R[H] = rr >> 8u;
+            R[L] = (uint8_t) rr;
+        case 3:
+            sp -= 1;
+    }
+
+    return 8;
+}
+
+
 
 // END ARITHMETIC instructions
 

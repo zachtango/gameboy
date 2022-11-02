@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <utility>
 
 using namespace std;
 
@@ -28,8 +29,6 @@ private:
     void step(); // fetch-decode-execute
 
     uint8_t readByte();
-
-    uint8_t *register8(uint8_t);
 
     // LOAD instructions
 
@@ -112,11 +111,51 @@ private:
     uint8_t dec_rr();
     uint8_t add_spdd();
     uint8_t ld_hlspdd();
-
     // END ARITHMETIC instructions
 
-    // CONTROL FLOW instructions
+    // ROTATE SHIFT instructions
+    uint8_t rlca();
+    uint8_t rla();
+    uint8_t rrca();
+    uint8_t rra();
+    uint8_t rlc_r();
+    uint8_t rlc_hl();
+    uint8_t rl_r();
+    uint8_t rl_hl();
+    uint8_t rrc_r();
+    uint8_t rrc_hl();
+    uint8_t rr_r();
+    uint8_t rr_hl();
+    uint8_t sla_r();
+    uint8_t sla_hl();
+    uint8_t swap_r();
+    uint8_t swap_hl();
+    uint8_t sra_r();
+    uint8_t sra_hl();
+    uint8_t srl_r();
+    uint8_t srl_hl();
+    // END ROTATE SHIFT instructions
 
+    // SINGLE-BIT OPERATION instructions
+    uint8_t bit_nr();
+    uint8_t bit_nhl();
+    uint8_t set_nr();
+    uint8_t set_nhl();
+    uint8_t res_nr();
+    uint8_t res_nhl();
+    // END SINGLE-BIT OPERATION instructions
+
+    // CPU CONTROL instructions
+    uint8_t ccf();
+    uint8_t scf();
+    uint8_t nop();
+    uint8_t halt();
+    uint8_t stop();
+    uint8_t di();
+    uint8_t ei();
+    // END CPU CONTROL instructions
+
+    // JUMP instructions
     uint8_t jp_nn();
     uint8_t jp_hl();
     uint8_t jp_ccnn();
@@ -129,7 +168,6 @@ private:
     uint8_t ret_cc();
     uint8_t reti();
     uint8_t rst_n();
-
-    // END CONTROL FLOW instructions
+    // END JUMP instructions
 
 };
