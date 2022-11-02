@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <utility>
+#include <unordered_map>
 
 using namespace std;
 
@@ -9,12 +10,13 @@ using namespace std;
 #define TMA 0xFF06 // timer modulo
 #define TAC 0xFF07 // time control
 
+
 enum Register { B, C, D, E, H, L, F, A };
 
 class Gameboy{
 
 public:
-
+    Gameboy();
 
 private:
     
@@ -25,6 +27,10 @@ private:
     uint8_t opcode; // M[pc]
     uint64_t t_cycles; // fixme not sure if this is the right variable
     bool IME;
+
+    typedef uint8_t (Gameboy::*GameboyFunc)();
+    unordered_map<uint8_t, GameboyFunc> instruction_noprefix; // opcode returns function pointer
+    unordered_map<uint8_t, GameboyFunc> instruction_cbprefix;
 
     void step(); // fetch-decode-execute
 
@@ -158,14 +164,13 @@ private:
     // JUMP instructions
     uint8_t jp_nn();
     uint8_t jp_hl();
-    uint8_t jp_ccnn();
-    uint8_t jr_e();
-    uint8_t jr_cce();
+    uint8_t jp_fnn();
+    uint8_t jr_pcdd();
+    uint8_t jr_fpcdd();
     uint8_t call_nn();
-    uint8_t call_ccnn();
+    uint8_t call_fnn();
     uint8_t ret();
-    uint8_t ret_nn();
-    uint8_t ret_cc();
+    uint8_t ret_f();
     uint8_t reti();
     uint8_t rst_n();
     // END JUMP instructions
