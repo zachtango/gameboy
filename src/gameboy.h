@@ -8,7 +8,7 @@ using namespace std;
 #define TMA 0xFF06 // timer modulo
 #define TAC 0xFF07 // time control
 
-enum Register { B, C, D, E, H, L, A, F };
+enum Register { B, C, D, E, H, L, F, A };
 
 class Gameboy{
 
@@ -23,10 +23,13 @@ private:
     uint16_t pc; // index value of current instruction in memory arr
     uint8_t opcode; // M[pc]
     uint64_t t_cycles; // fixme not sure if this is the right variable
+    bool IME;
 
     void step(); // fetch-decode-execute
 
     uint8_t readByte();
+
+    uint8_t *register8(uint8_t);
 
     // LOAD instructions
 
@@ -72,39 +75,60 @@ private:
     */
 
     // 8 bit arithmetic
-    void I_add();
-    void I_adc();
-    void I_sub();
-    void I_sbc();
-    void I_and();
-    void I_or();
-    void I_xor();
-    void I_cp();
-    void I_inc();
-    void I_dec();
+    uint8_t add_ar();
+    uint8_t add_an();
+    uint8_t add_ahl();
+    uint8_t adc_ar();
+    uint8_t adc_an();
+    uint8_t adc_ahl();
+    uint8_t sub_ar();
+    uint8_t sub_an();
+    uint8_t sub_ahl();
+    uint8_t sbc_ar();
+    uint8_t sbc_an();
+    uint8_t sbc_ahl();
+    uint8_t and_ar();
+    uint8_t and_an();
+    uint8_t and_ahl();
+    uint8_t xor_ar();
+    uint8_t xor_an();
+    uint8_t xor_ahl();
+    uint8_t or_ar();
+    uint8_t or_an();
+    uint8_t or_ahl();
+    uint8_t cp_ar();
+    uint8_t cp_an();
+    uint8_t cp_ahl();
+    uint8_t inc_r();
+    uint8_t inc_hl();
+    uint8_t dec_r();
+    uint8_t dec_hl();
+    uint8_t daa();
+    uint8_t cpl();
 
     // 16 bit arithmetic
-    void I_addHL();
-    void I_addSP();
-    void I_incNN();
-    void I_decNN();
+    uint8_t add_hlrr();
+    uint8_t inc_rr();
+    uint8_t dec_rr();
+    uint8_t add_spdd();
+    uint8_t ld_hlspdd();
 
     // END ARITHMETIC instructions
 
     // CONTROL FLOW instructions
 
-    uint8_t jp_nn(uint16_t);
-    uint8_t jp_hl(uint16_t);
-    uint8_t jp_(uint16_t, uint16_t);
-    uint8_t jprE(uint8_t);
-    uint8_t jprCCE();
-    uint8_t callNN(uint16_t);
-    uint8_t callCCNN(uint16_t, uint16_t);
+    uint8_t jp_nn();
+    uint8_t jp_hl();
+    uint8_t jp_ccnn();
+    uint8_t jr_e();
+    uint8_t jr_cce();
+    uint8_t call_nn();
+    uint8_t call_ccnn();
     uint8_t ret();
-    uint8_t retNN(uint16_t);
-    uint8_t retCC(uint16_t);
+    uint8_t ret_nn();
+    uint8_t ret_cc();
     uint8_t reti();
-    uint8_t rstN(uint8_t);
+    uint8_t rst_n();
 
     // END CONTROL FLOW instructions
 

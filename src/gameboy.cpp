@@ -1,6 +1,40 @@
 
 #include <gameboy.h>
 
+uint8_t *Gameboy::register8(uint8_t r){
+    /*
+        r8 table is
+        0 B
+        1 C
+        2 D
+        3 E
+        4 H
+        5 L
+        6 (HL)
+        7 A
+    */
+
+    switch(r){
+        case 0:
+            return &R[B];
+        case 1:
+            return &R[C];
+        case 2:
+            return &R[D];
+        case 3:
+            return &R[E];
+        case 4:
+            return &R[H];
+        case 5:
+            return &R[L];
+        // case 6:
+        //     return &M[ (R[H] << 8u) | R[L] ];
+        case 7:
+            return &R[A];
+    }
+
+    return nullptr;
+}
 
 void Gameboy::step(){
     // update timer
@@ -313,111 +347,434 @@ uint8_t Gameboy::pop_rr(){
     return 12;
 }
 
+// ARITHMETIC instructions
+
+// 8 bit ARITHMETIC
+// FIXME CHECK FLAGS
+
+uint8_t Gameboy::add_ar(){
+
+    uint8_t r = opcode & 0x0F;
+
+    R[A] += R[r];
+
+    return 4;
+}
+
+uint8_t Gameboy::add_an(){
+    
+    uint8_t n = readByte();
+
+    R[A] += n;
+
+    return 8;
+}
+
+uint8_t Gameboy::add_ahl(){
+
+    uint16_t hl = (R[H] << 8u) | R[L];
+
+    R[A] += M[hl];
+
+    return 8;
+}
+
+uint8_t Gameboy::adc_ar(){
+
+    uint8_t r = opcode & 0x0F;
+
+    R[A] += R[r]; // + cy carry flag
+
+    return 4;
+}
+
+uint8_t Gameboy::adc_an(){
+
+    uint8_t n = readByte();
+
+    R[A] += n; // + cy carry flag
+
+    return 8;
+}
+
+uint8_t Gameboy::adc_ahl(){
+
+    uint16_t hl = (R[H] << 8u) | R[L];
+
+    R[A] += M[hl]; // + cy carry flag
+
+    return 8;
+}
+
+uint8_t Gameboy::sub_ar(){
+
+    uint8_t r = opcode & 0x0F;
+
+    R[A] -= r;
+
+    return 4;
+}
+
+uint8_t Gameboy::sub_an(){
+    
+    uint8_t n = readByte();
+
+    R[A] -= n;
+
+    return 8;
+}
+
+uint8_t Gameboy::sub_ahl(){
+
+    uint16_t hl = (R[H] << 8u) | R[L];
+
+    R[A] -= M[hl];
+
+    return 8;
+}
+
+uint8_t Gameboy::sbc_ar(){
+
+    uint8_t r = opcode & 0x0F;
+
+    R[A] -= (R[r]); // + cy flag
+
+    return 4;
+}
+
+uint8_t Gameboy::sbc_an(){
+
+    uint8_t n = readByte();
+
+    R[A] -= n; // + cy flag
+
+    return 8;
+}
+
+uint8_t Gameboy::sbc_ahl(){
+
+    uint16_t hl = (R[H] << 8u) | R[L];
+
+    R[A] -= M[hl]; // + cy flag
+
+    return 8;
+}
+
+uint8_t Gameboy::and_ar(){
+
+    uint8_t r = opcode & 0x0F;
+
+    R[A] &= R[r];
+
+    return 4;
+}
+
+uint8_t Gameboy::and_an(){
+
+    uint8_t n = readByte();
+
+    R[A] &= n;
+
+    return 8;
+}
+
+uint8_t Gameboy::and_ahl(){
+
+    uint16_t hl = (R[H] << 8u) | R[L];
+
+    R[A] &= M[hl];
+
+    return 8;
+}
+
+uint8_t Gameboy::xor_ar(){
+
+    uint8_t r = opcode & 0x0F;
+
+    R[A] ^= R[r];
+
+    return 4;
+}
+
+uint8_t Gameboy::xor_an(){
+
+    uint8_t n = readByte();
+
+    R[A] ^= n;
+
+    return 8;
+}
+
+uint8_t Gameboy::xor_ahl(){
+
+    uint16_t hl = (R[H] << 8u) | R[L];
+
+    R[A] ^= M[hl];
+
+    return 8;
+}
+
+uint8_t Gameboy::or_ar(){
+
+    uint8_t r = opcode & 0x0F;
+
+    R[A] |= R[r];
+
+    return 4;
+}
+
+uint8_t Gameboy::or_an(){
+
+    uint8_t n = readByte();
+
+    R[A] |= n;
+
+    return 8;
+}
+
+uint8_t Gameboy::or_ahl(){
+
+    uint16_t hl = (R[H] << 8u) | R[L];
+
+    R[A] |= M[hl];
+
+    return 8;
+}
+
+uint8_t Gameboy::or_ahl(){
+
+    uint16_t hl = (R[H] << 8u) | R[L];
+
+    R[A] |= hl;
+
+    return 8;
+}
+
+uint8_t Gameboy::cp_ar(){
+
+    uint8_t r = opcode & 0x0F;
+
+    // compare a - r change flags
+
+    return 4;
+}
+
+uint8_t Gameboy::cp_an(){
+
+    uint8_t n = readByte();
+
+    // compare a - n change flags
+
+    return 8;
+}
+
+uint8_t Gameboy::cp_ahl(){
+
+    uint16_t hl = (R[H] << 8u) | R[L];
+
+    // compare a - hl
+
+    return 8;
+}
+
+uint8_t Gameboy::inc_r(){
+
+    uint8_t r = opcode >> 3u;
+
+    R[r] += 1;
+
+    return 4;
+}
+
+uint8_t Gameboy::inc_hl(){
+
+    uint16_t hl = (R[H] << 8u) | R[L];
+
+    M[hl] += 1;
+
+    return 12;
+}
+
+uint8_t Gameboy::dec_r(){
+
+    uint8_t r = opcode >> 3u;
+
+    R[r] -= 1;
+
+    return 4;
+}
+
+uint8_t Gameboy::dec_hl(){
+
+    uint16_t hl = (R[H] << 8u) | R[L];
+
+    M[hl] -= 1;
+
+    return 12;
+}
+
+uint8_t Gameboy::daa(){
+    return 4;
+}
+
+uint8_t Gameboy::cpl(){
+
+    return 4;
+}
+
+// END ARITHMETIC instructions
+
 // CONTROL FLOW instructions
 
-void Gameboy::jp_nn(uint16_t NN){
-    // opcode 0xC3
-    pc = NN;
+uint8_t Gameboy::jp_nn(){
+    uint8_t lsb = readByte();
+    uint8_t msb = readByte();
+
+    pc = (msb << 8u) | lsb;
+
+    return 16;
 }
 
-void Gameboy::jp_hl(uint16_t HL){
-    // opcode 0xe9
-    pc = R[HL];
+uint8_t Gameboy::jp_hl(){
+    pc = (R[H] << 8u) | R[L];
+
+    return 4;
 }
 
-void Gameboy::I_jumpCCNN(uint16_t CC, uint16_t NN){
-    // opcode 0xC2 0xD2 0xCA 0xDA
+uint8_t Gameboy::jp_ccnn(){
+    uint8_t cc = (opcode >> 3u) & 0x3;
 
     bool flag;
-    // CC IN THE OPCODE
-    switch(CC){
-        case 0x00:  // NZ
+
+    switch(cc){
+        case 0x0:  // NZ
             // flag =
             break;
-        case 0x01:  // Z
+        case 0x1:  // Z
             break;
-        case 0x02:  // NC
+        case 0x2:  // NC
             break;
-        case 0x03:  // C
+        case 0x3:  // C
     }
+
+    uint8_t lsb = readByte();
+    uint8_t msb = readByte();
 
     if(flag){
-        pc = NN;
+        pc = (msb << 8u) | lsb;
+
+        return 16;
     }
+
+    return 12;
 }
 
-void Gameboy::I_jumprE(uint8_t E){
-    // opcode 0x18
-    pc += E;
+uint8_t Gameboy::jr_e(){
+    pc += readByte();
+
+    return 12;
 }
 
-void Gameboy::I_jumprCCE(uint16_t CC, uint8_t E){
-    // opcode 0x20 0x30 0x28 0x38
+uint8_t Gameboy::jr_cce(){
+    uint8_t cc = (opcode >> 3u) & 0x3;
+
     bool flag;
-    // CC IN THE OPCODE
-    switch(CC){
-        case 0x00:  // NZ
+    
+    switch(cc){
+        case 0x0:  // NZ
             // flag =
             break;
-        case 0x01:  // Z
+        case 0x1:  // Z
             break;
-        case 0x02:  // NC
+        case 0x2:  // NC
             break;
-        case 0x03:  // C
+        case 0x3:  // C
     }
+
+    uint8_t e = readByte();
 
     if(flag){
-        pc += E;
+        pc += e;
+
+        return 12;
     }
+
+    return 8;
 }
 
-void Gameboy::I_callNN(uint16_t NN){
-    // opcode 0xCD
+
+uint8_t Gameboy::call_nn(){
+    uint8_t lsb = readByte();
+    uint8_t msb = readByte();
+
     sp -= 1;
-    M[sp] = 0x0F & NN;
+    M[sp] = pc >> 8u;
     
     sp -= 1;
-    M[sp] = 0xF0 & NN;
+    M[sp] = (uint8_t) pc;
 
-    pc = NN;
+    pc = (msb << 8u) | lsb;
+
+    return 24;
 }
 
-void Gameboy::I_callCCNN(uint16_t CC, uint16_t NN){
-    // opcode 0xC4 0xD4 0xCC 0xDC
+uint8_t Gameboy::call_ccnn(){
+    uint8_t cc = (opcode >> 3u) & 0x3;
+
+    uint8_t lsb = readByte();
+    uint8_t msb = readByte();
 
     bool flag;
 
-    switch(CC){
-
+    switch(cc){
+        case 0x0:
+            break;
+        case 0x1:
+            break;
+        case 0x2:
+            break;
+        case 0x3:
+        
     }
 
     if(flag){
         sp -= 1;
-        M[sp] = 0x0F & NN;
+        M[sp] = pc >> 8u;
         
         sp -= 1;
-        M[sp] = 0xF0 & NN;
+        M[sp] = (uint8_t) pc;
 
-        pc = NN;
+        pc = (msb << 8u) | lsb;
+
+        return 24;
     }
+
+    return 12;
 }
 
-void Gameboy::I_ret(){
-    // opcode 0xC9
-    uint8_t lsb = M[sp];
-    sp += 1;
+uint8_t Gameboy::ret(){
+    uint8_t lsb = readByte();
+    uint8_t msb = readByte();
 
-    pc = (lsb << 8u) | M[sp];
-    sp += 1;
+    pc = (msb << 8u) | lsb;
+
+    return 16;
 }
 
-void Gameboy::I_retCC(uint16_t CC){
-    // opcode 0xC0 0xD0 0xC8 0xD8
+uint8_t Gameboy::ret_cc(){
+    uint8_t cc = (opcode >> 3u) & 0x3;
 
     bool flag;
 
-    switch(CC){
-
+    switch(cc){
+        case 0x0:
+            break;
+        case 0x1:
+            break;
+        case 0x2:
+            break;
+        case 0x3:
+            
     }
 
     if(flag){
@@ -426,476 +783,33 @@ void Gameboy::I_retCC(uint16_t CC){
 
         pc = (lsb << 8u) | M[sp];
         sp += 1;
-    }
-}
 
-void Gameboy::I_reti(){
-    // opcode 0xD9
-    // interrupts by setting IME = 1
-
-    uint8_t lsb = M[sp];
-    sp += 1;
-
-    pc = (lsb << 8u) | M[sp];
-    sp += 1;
-
-    // IME = 1;
-}
-
-void Gameboy::I_rstN(uint8_t N){
-    // opcode 0xC7 0xD7 0xE7 0xF7 0xCF 0xDF 0xEF 0xFF
-    
-    sp -= 1;
-    M[sp] = 0xF0 & pc;
-
-    sp -= 1;
-    M[sp] = 0x0F & pc;
-
-    pc = N;
-}
-
-// ARITHMETIC instructions
-
-// 8 bit ARITHMETIC
-void Gameboy::I_add(){  
-    uint8_t operand;
-
-    switch(opcode){
-        case 0x87:
-            operand = R[A];
-            break;
-        case 0x80:
-            operand = R[B];
-            break;
-        case 0x81:
-            operand = R[C];
-            break;
-        case 0x82:
-            operand = R[D];
-            break;
-        case 0x83:
-            operand = R[E];
-            break;
-        case 0x84:
-            operand = R[H];
-            break;
-        case 0x85:
-            operand = R[L];
-            break;
-        case 0x86:
-            operand = M[ (R[H] << 8u) | R[L] ];
-            break;
-        case 0xC6:
-            // operand = n
-            // get n from M[pc + 1] (encoding)
+        return 20;
     }
 
-    // FIXME check flags
-
-    R[0xA] += operand;
-
+    return 8;
 }
 
-void Gameboy::I_adc(){
-    uint8_t operand;
+uint8_t Gameboy::reti(){
+    uint8_t lsb = readByte();
+    uint8_t msb = readByte();
 
-    switch(opcode){
-        case 0x8F:
-            operand = R[A];
-            break;
-        case 0x88:
-            operand = R[B];
-            break;
-        case 0x89:
-            operand = R[C];
-            break;
-        case 0x8A:
-            operand = R[D];
-            break;
-        case 0x8B:
-            operand = R[E];
-            break;
-        case 0x8C:
-            operand = R[H];
-            break;
-        case 0x8D:
-            operand = R[L];
-            break;
-        case 0x8E:
-            operand = M[ (R[H] << 8u) | R[L] ];
-            break;
-        case 0xCE:
-            // operand = n
-            // get n from M[pc + 1] (encoding)
-    }
+    pc = (msb << 8u) | lsb;
 
-    //operand += carry flag;
+    IME = 1;
 
-    // FIXME check flags
-
-    R[0xA] += operand;
-
+    return 16;
 }
 
-void Gameboy::I_sub(){
-    uint8_t operand;
+uint8_t Gameboy::rst_n(){
+    // call to 00, 08, 10, 18, 20, 28, 30, 38
+    uint8_t call[8] = {0x00, 0x08, 0x10, 0x18, 0x20, 0x28, 0x30, 0x38};
 
-    switch(opcode){
-        case 0x97:
-            operand = R[A];
-            break;
-        case 0x90:
-            operand = R[B];
-            break;
-        case 0x91:
-            operand = R[C];
-            break;
-        case 0x92:
-            operand = R[D];
-            break;
-        case 0x93:
-            operand = R[E];
-            break;
-        case 0x94:
-            operand = R[H];
-            break;
-        case 0x95:
-            operand = R[L];
-            break;
-        case 0x96:
-            operand = M[ (R[H] << 8u) | R[L] ];
-            break;
-        case 0xD6:
-            // operand = n
-            // get n from M[pc + 1] (encoding)
-    }
+    uint8_t xxx = (opcode >> 3u) & 0x3;
 
-    // FIXME check flags affected
+    pc = call[xxx];
 
-    R[A] -= operand;
+    return 16;
 }
 
-void Gameboy::I_sbc(){
-
-    uint8_t operand;
-
-    switch(opcode){
-        case 0x9F:
-            operand = R[A];
-            break;
-        case 0x98:
-            operand = R[B];
-            break;
-        case 0x99:
-            operand = R[C];
-            break;
-        case 0x9A:
-            operand = R[D];
-            break;
-        case 0x9B:
-            operand = R[E];
-            break;
-        case 0x9C:
-            operand = R[H];
-            break;
-        case 0x9D:
-            operand = R[L];
-            break;
-        case 0x9E:
-            operand = M[ (R[H] << 8u) | R[L] ];
-            break;
-        case 0xDE:
-            // operand = n
-            // get n from M[pc + 1] (encoding)
-    }
-    
-    // operand += carry flag
-
-    // FIXME check flags affected
-
-    R[A] -= operand;
-
-}
-
-void Gameboy::I_and(){
-
-    uint8_t operand;
-
-    switch(opcode){
-        case 0xA7:
-            operand = R[A];
-            break;
-        case 0xA0:
-            operand = R[B];
-            break;
-        case 0xA1:
-            operand = R[C];
-            break;
-        case 0xA2:
-            operand = R[D];
-            break;
-        case 0xA3:
-            operand = R[E];
-            break;
-        case 0xA4:
-            operand = R[H];
-            break;
-        case 0xA5:
-            operand = R[L];
-            break;
-        case 0xA6:
-            operand = M[ (R[H] << 8u) | R[L] ];
-            break;
-        case 0xE6:
-            // operand = n
-            // get n from M[pc + 1] (encoding)
-    }
-
-    // FIXME check flags affected
-
-    R[A] &= operand; // not sure if it's supposed to be bitwise or not
-
-}
-
-void Gameboy::I_or(){
-
-    uint8_t operand;
-
-    switch(opcode){
-        case 0xB7:
-            operand = R[A];
-            break;
-        case 0xB0:
-            operand = R[B];
-            break;
-        case 0xB1:
-            operand = R[C];
-            break;
-        case 0xB2:
-            operand = R[D];
-            break;
-        case 0xB3:
-            operand = R[E];
-            break;
-        case 0xB4:
-            operand = R[H];
-            break;
-        case 0xB5:
-            operand = R[L];
-            break;
-        case 0xB6:
-            operand = M[ (R[H] << 8u) | R[L] ];
-            break;
-        case 0xF6:
-            // operand = n
-            // get n from M[pc + 1] (encoding)
-    }
-
-    // FIXME check flags affected
-
-    R[A] |= operand; // not sure if it's supposed to be bitwise or not
-
-}
-
-void Gameboy::I_xor(){
-
-    uint8_t operand;
-
-    switch(opcode){
-        case 0xAF:
-            operand = R[A];
-            break;
-        case 0xA8:
-            operand = R[B];
-            break;
-        case 0xA9:
-            operand = R[C];
-            break;
-        case 0xAA:
-            operand = R[D];
-            break;
-        case 0xAB:
-            operand = R[E];
-            break;
-        case 0xAC:
-            operand = R[H];
-            break;
-        case 0xAD:
-            operand = R[L];
-            break;
-        case 0xAE:
-            operand = M[ (R[H] << 8u) | R[L] ];
-            break;
-        case 0xEE:
-            // operand = n
-            // get n from M[pc + 1] (encoding)
-    }
-
-    // FIXME check flags affected
-
-    R[A] ^= operand; // not sure if it's supposed to be bitwise or not
-
-}
-
-void Gameboy::I_cp(){
-    uint8_t operand;
-
-    switch(opcode){
-        case 0xBF:
-            operand = R[A];
-            break;
-        case 0xB8:
-            operand = R[B];
-            break;
-        case 0xB9:
-            operand = R[C];
-            break;
-        case 0xBA:
-            operand = R[D];
-            break;
-        case 0xBB:
-            operand = R[E];
-            break;
-        case 0xBC:
-            operand = R[H];
-            break;
-        case 0xBD:
-            operand = R[L];
-            break;
-        case 0xBE:
-            operand = M[ (R[H] << 8u) | R[L] ];
-            break;
-        case 0xFE:
-            // operand = n
-            // get n from M[pc + 1] (encoding)
-    }
-
-    // FIXME check flags affected
-
-    // compare A with n (A - n and set flags but throw away result)
-
-}
-
-void Gameboy::I_inc(){
-
-    uint8_t *reg;
-
-    switch(opcode){
-        case 0x3C:
-            reg = &R[A];
-            break;
-        case 0x04:
-            reg = &R[B];
-            break;
-        case 0x0C:
-            reg = &R[C];
-            break;
-        case 0x14:
-            reg = &R[D];
-            break;
-        case 0x1C:
-            reg = &R[E];
-            break;
-        case 0x24:
-            reg = &R[H];
-            break;
-        case 0x2C:
-            reg = &R[L];
-            break;
-        case 0x34:
-            reg = &M[ (R[H] << 8u) | R[L] ];
-    }
-
-    // FIXME check flags affected
-    // c not affected
-
-    *reg += 1;
-
-}
-
-void Gameboy::I_dec(){
-
-    uint8_t *reg;
-
-    switch(opcode){
-        case 0x3D:
-            reg = &R[A];
-            break;
-        case 0x05:
-            reg = &R[B];
-            break;
-        case 0x0D:
-            reg = &R[C];
-            break;
-        case 0x15:
-            reg = &R[D];
-            break;
-        case 0x1D:
-            reg = &R[E];
-            break;
-        case 0x25:
-            reg = &R[H];
-            break;
-        case 0x2D:
-            reg = &R[L];
-            break;
-        case 0x35:
-            reg = &M[ (R[H] << 8u) | R[L] ];
-    }
-
-    // FIXME check flags affected
-    // c not affected
-
-    *reg -= 1;
-}
-
-// 16 bit ARITHMETIC
-void Gameboy::I_addHL(){
-    uint16_t hl = (R[H] << 8u) | R[L]; 
-    uint16_t operand;
-
-    switch(opcode){
-        case 0x09:
-            operand = (R[B] << 8u) | R[C];
-            break;
-        case 0x19:
-            operand = (R[D] << 8u) | R[E];
-            break;
-        case 29:
-            operand = hl;
-            break;
-        case 39:
-            operand = sp;
-    }
-
-    // set flags
-
-    R[H] = (hl >> 8u);
-    R[L] = (uint8_t) hl;
-}
-
-void Gameboy::I_addSP(){
-    // opcode 0xE8
-    uint8_t n;
-
-    // get n from byte after opcode E8 n
-    sp += n;
-}
-
-void Gameboy::I_incNN(){
-    // increment double registers, stored as little endian
-}
-
-void Gameboy::I_dec(){
-    // decrement double registers, stored as little endian
-}
-
-// END ARITHMETIC instructions
-
-
-// MISC instructions
-
-
-
-
-// END MISC instructions
+// END CONTROL FLOW instructions
