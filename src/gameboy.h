@@ -17,6 +17,7 @@ class Gameboy{
 
 public:
     Gameboy();
+    void step(); // fetch-decode-execute
 
 private:
     
@@ -32,9 +33,11 @@ private:
     unordered_map<uint8_t, GameboyFunc> instruction_noprefix; // opcode returns function pointer
     unordered_map<uint8_t, GameboyFunc> instruction_cbprefix;
 
-    void step(); // fetch-decode-execute
+    void loadROM(string);
 
     uint8_t readByte();
+
+    void execInstruction();
 
     // LOAD instructions
 

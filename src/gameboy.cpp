@@ -1,599 +1,627 @@
 #include "gameboy.h"
+#include <iostream>
+#include <fstream>
+#include <iomanip>
 
 Gameboy::Gameboy(){
+    pc = 0;
+    t_cycles = 0;
 
     // https://gbdev.io/pandocs/Memory_Map.html
     // mem map
-    // 0x0000 - 0x3FFF cartridge, usually fixed bank
-    // 0x4000 - 0x7FFF cartridge, switchable bank
-    // 0x8000 - 9FFFF video RAM
-    //
+    // 0x0000 - 0x3FFF ROM cartridge, usually fixed bank
+    // boot ROM burned inside the CPU, mapped over the cartridge ROM at first
+    // boot-up animation plays before control handed to cartridge's ROM at 0x0100
+    
+    // https://gbdev.gg8.se/files/roms/bootroms/
+    // boot rom
+    ifstream file;
+    file.open("roms/dmg_boot.bin", ios::binary | ios::ate);
+    
+    if( file.is_open() ){
+        streampos size = file.tellg();
+        char *buffer = new char[size];
+
+        // load file instr into buffer
+        file.seekg(0, ios::beg);
+        file.read(buffer, size);
+        file.close();
+
+        for(uint32_t i = 0; i < size; i++){
+            M[i] = buffer[i];
+        }
+
+        delete [] buffer;
+    }
+
+    // 0x4000 - 0x7FFF ROM cartridge, switchable bank
+    // 0x8000 - 0x9FFFF video RAM
+    // 0xA000 - 0xBFFFF external RAM
+    
 
     // https://izik1.github.io/gbops/index.html
     // no prefix
-    instruction_noprefix[0x00] = nop;
-    instruction_noprefix[0x01] = ld_rrnn;
-    instruction_noprefix[0x02] = ld_bca;
-    instruction_noprefix[0x03] = inc_rr;
-    instruction_noprefix[0x04] = inc_r;
-    instruction_noprefix[0x05] = dec_r;
-    instruction_noprefix[0x06] = ld_rn;
-    instruction_noprefix[0x07] = rlc_r;
-    instruction_noprefix[0x08] = ld_nnsp;
-    instruction_noprefix[0x09] = add_hlrr;
-    instruction_noprefix[0x0A] = ld_abc;
-    instruction_noprefix[0x0B] = dec_rr;
-    instruction_noprefix[0x0C] = inc_r;
-    instruction_noprefix[0x0D] = dec_r;
-    instruction_noprefix[0x0E] = ld_rn;
-    instruction_noprefix[0x0F] = rrc_r;
+    // instruction_noprefix[0x00] = nop;
+    // instruction_noprefix[0x01] = ld_rrnn;
+    // instruction_noprefix[0x02] = ld_bca;
+    // instruction_noprefix[0x03] = inc_rr;
+    // instruction_noprefix[0x04] = inc_r;
+    // instruction_noprefix[0x05] = dec_r;
+    // instruction_noprefix[0x06] = ld_rn;
+    // instruction_noprefix[0x07] = rlc_r;
+    // instruction_noprefix[0x08] = ld_nnsp;
+    // instruction_noprefix[0x09] = add_hlrr;
+    // instruction_noprefix[0x0A] = ld_abc;
+    // instruction_noprefix[0x0B] = dec_rr;
+    // instruction_noprefix[0x0C] = inc_r;
+    // instruction_noprefix[0x0D] = dec_r;
+    // instruction_noprefix[0x0E] = ld_rn;
+    // instruction_noprefix[0x0F] = rrc_r;
 
-    instruction_noprefix[0x10] = stop;
-    instruction_noprefix[0x11] = ld_rrnn;
-    instruction_noprefix[0x12] = ld_dea;
-    instruction_noprefix[0x13] = inc_rr;
-    instruction_noprefix[0x14] = inc_r;
-    instruction_noprefix[0x15] = dec_r;
-    instruction_noprefix[0x16] = ld_rn;
-    instruction_noprefix[0x17] = rla;
-    instruction_noprefix[0x18]; // implement me
-    instruction_noprefix[0x19] = add_hlrr;
-    instruction_noprefix[0x1A] = ld_ade;
-    instruction_noprefix[0x1B] = dec_rr;
-    instruction_noprefix[0x1C] = inc_r;
-    instruction_noprefix[0x1D] = dec_r;
-    instruction_noprefix[0x1E] = ld_rn;
-    instruction_noprefix[0x1F] = rra;
+    // instruction_noprefix[0x10] = stop;
+    // instruction_noprefix[0x11] = ld_rrnn;
+    // instruction_noprefix[0x12] = ld_dea;
+    // instruction_noprefix[0x13] = inc_rr;
+    // instruction_noprefix[0x14] = inc_r;
+    // instruction_noprefix[0x15] = dec_r;
+    // instruction_noprefix[0x16] = ld_rn;
+    // instruction_noprefix[0x17] = rla;
+    // instruction_noprefix[0x18]; // implement me
+    // instruction_noprefix[0x19] = add_hlrr;
+    // instruction_noprefix[0x1A] = ld_ade;
+    // instruction_noprefix[0x1B] = dec_rr;
+    // instruction_noprefix[0x1C] = inc_r;
+    // instruction_noprefix[0x1D] = dec_r;
+    // instruction_noprefix[0x1E] = ld_rn;
+    // instruction_noprefix[0x1F] = rra;
 
-    instruction_noprefix[0x20]; // impl me
-    instruction_noprefix[0x21] = ld_rrnn;
-    instruction_noprefix[0x22] = ldi_hla;
-    instruction_noprefix[0x23] = inc_hl;
-    instruction_noprefix[0x24] = inc_r;
-    instruction_noprefix[0x25] = dec_r;
-    instruction_noprefix[0x26] = ld_rn;
-    instruction_noprefix[0x27] = daa;
-    instruction_noprefix[0x28]; // impl me
-    instruction_noprefix[0x29] = add_hlrr;
-    instruction_noprefix[0x2A] = ldi_ahl;
-    instruction_noprefix[0x2B] = dec_rr;
-    instruction_noprefix[0x2C] = inc_r;
-    instruction_noprefix[0x2D] = dec_r;
-    instruction_noprefix[0x2E] = ld_rn;
-    instruction_noprefix[0x2F] = cpl;
+    // instruction_noprefix[0x20]; // impl me
+    // instruction_noprefix[0x21] = ld_rrnn;
+    // instruction_noprefix[0x22] = ldi_hla;
+    // instruction_noprefix[0x23] = inc_hl;
+    // instruction_noprefix[0x24] = inc_r;
+    // instruction_noprefix[0x25] = dec_r;
+    // instruction_noprefix[0x26] = ld_rn;
+    // instruction_noprefix[0x27] = daa;
+    // instruction_noprefix[0x28]; // impl me
+    // instruction_noprefix[0x29] = add_hlrr;
+    // instruction_noprefix[0x2A] = ldi_ahl;
+    // instruction_noprefix[0x2B] = dec_rr;
+    // instruction_noprefix[0x2C] = inc_r;
+    // instruction_noprefix[0x2D] = dec_r;
+    // instruction_noprefix[0x2E] = ld_rn;
+    // instruction_noprefix[0x2F] = cpl;
 
-    instruction_noprefix[0x30]; // impl me
-    instruction_noprefix[0x31] = ld_rrnn;
-    instruction_noprefix[0x32] = ldd_hla;
-    instruction_noprefix[0x33] = inc_rr;
-    instruction_noprefix[0x34] = inc_hl;
-    instruction_noprefix[0x35] = dec_hl;
-    instruction_noprefix[0x36] = ld_hln;
-    instruction_noprefix[0x37] = scf;
-    instruction_noprefix[0x38]; // impl me
-    instruction_noprefix[0x39] = add_hlrr;
-    instruction_noprefix[0x3A] = ldd_ahl;
-    instruction_noprefix[0x3B] = dec_rr;
-    instruction_noprefix[0x3C] = inc_r;
-    instruction_noprefix[0x3D] = dec_r;
-    instruction_noprefix[0x3E] = ld_rn;
-    instruction_noprefix[0x3F] = ccf;
+    // instruction_noprefix[0x30]; // impl me
+    // instruction_noprefix[0x31] = ld_rrnn;
+    // instruction_noprefix[0x32] = ldd_hla;
+    // instruction_noprefix[0x33] = inc_rr;
+    // instruction_noprefix[0x34] = inc_hl;
+    // instruction_noprefix[0x35] = dec_hl;
+    // instruction_noprefix[0x36] = ld_hln;
+    // instruction_noprefix[0x37] = scf;
+    // instruction_noprefix[0x38]; // impl me
+    // instruction_noprefix[0x39] = add_hlrr;
+    // instruction_noprefix[0x3A] = ldd_ahl;
+    // instruction_noprefix[0x3B] = dec_rr;
+    // instruction_noprefix[0x3C] = inc_r;
+    // instruction_noprefix[0x3D] = dec_r;
+    // instruction_noprefix[0x3E] = ld_rn;
+    // instruction_noprefix[0x3F] = ccf;
 
-    instruction_noprefix[0x40] = ld_rr;
-    instruction_noprefix[0x41] = ld_rr;
-    instruction_noprefix[0x42] = ld_rr;
-    instruction_noprefix[0x43] = ld_rr;
-    instruction_noprefix[0x44] = ld_rr;
-    instruction_noprefix[0x45] = ld_rr;
-    instruction_noprefix[0x46] = ld_rr;
-    instruction_noprefix[0x47] = ld_rr;
-    instruction_noprefix[0x48] = ld_rr;
-    instruction_noprefix[0x49] = ld_rr;
-    instruction_noprefix[0x4A] = ld_rr;
-    instruction_noprefix[0x4B] = ld_rr;
-    instruction_noprefix[0x4C] = ld_rr;
-    instruction_noprefix[0x4D] = ld_rr;
-    instruction_noprefix[0x4E] = ld_rr;
-    instruction_noprefix[0x4F] = ld_rr;
+    // instruction_noprefix[0x40] = ld_rr;
+    // instruction_noprefix[0x41] = ld_rr;
+    // instruction_noprefix[0x42] = ld_rr;
+    // instruction_noprefix[0x43] = ld_rr;
+    // instruction_noprefix[0x44] = ld_rr;
+    // instruction_noprefix[0x45] = ld_rr;
+    // instruction_noprefix[0x46] = ld_rr;
+    // instruction_noprefix[0x47] = ld_rr;
+    // instruction_noprefix[0x48] = ld_rr;
+    // instruction_noprefix[0x49] = ld_rr;
+    // instruction_noprefix[0x4A] = ld_rr;
+    // instruction_noprefix[0x4B] = ld_rr;
+    // instruction_noprefix[0x4C] = ld_rr;
+    // instruction_noprefix[0x4D] = ld_rr;
+    // instruction_noprefix[0x4E] = ld_rr;
+    // instruction_noprefix[0x4F] = ld_rr;
 
-    instruction_noprefix[0x50] = ld_rr;
-    instruction_noprefix[0x51] = ld_rr;
-    instruction_noprefix[0x52] = ld_rr;
-    instruction_noprefix[0x53] = ld_rr;
-    instruction_noprefix[0x54] = ld_rr;
-    instruction_noprefix[0x55] = ld_rr;
-    instruction_noprefix[0x56] = ld_rr;
-    instruction_noprefix[0x57] = ld_rr;
-    instruction_noprefix[0x58] = ld_rr;
-    instruction_noprefix[0x59] = ld_rr;
-    instruction_noprefix[0x5A] = ld_rr;
-    instruction_noprefix[0x5B] = ld_rr;
-    instruction_noprefix[0x5C] = ld_rr;
-    instruction_noprefix[0x5D] = ld_rr;
-    instruction_noprefix[0x5E] = ld_rr;
-    instruction_noprefix[0x5F] = ld_rr;
+    // instruction_noprefix[0x50] = ld_rr;
+    // instruction_noprefix[0x51] = ld_rr;
+    // instruction_noprefix[0x52] = ld_rr;
+    // instruction_noprefix[0x53] = ld_rr;
+    // instruction_noprefix[0x54] = ld_rr;
+    // instruction_noprefix[0x55] = ld_rr;
+    // instruction_noprefix[0x56] = ld_rr;
+    // instruction_noprefix[0x57] = ld_rr;
+    // instruction_noprefix[0x58] = ld_rr;
+    // instruction_noprefix[0x59] = ld_rr;
+    // instruction_noprefix[0x5A] = ld_rr;
+    // instruction_noprefix[0x5B] = ld_rr;
+    // instruction_noprefix[0x5C] = ld_rr;
+    // instruction_noprefix[0x5D] = ld_rr;
+    // instruction_noprefix[0x5E] = ld_rr;
+    // instruction_noprefix[0x5F] = ld_rr;
 
-    instruction_noprefix[0x60] = ld_rr;
-    instruction_noprefix[0x61] = ld_rr;
-    instruction_noprefix[0x62] = ld_rr;
-    instruction_noprefix[0x63] = ld_rr;
-    instruction_noprefix[0x64] = ld_rr;
-    instruction_noprefix[0x65] = ld_rr;
-    instruction_noprefix[0x66] = ld_rr;
-    instruction_noprefix[0x67] = ld_rr;
-    instruction_noprefix[0x68] = ld_rr;
-    instruction_noprefix[0x69] = ld_rr;
-    instruction_noprefix[0x6A] = ld_rr;
-    instruction_noprefix[0x6B] = ld_rr;
-    instruction_noprefix[0x6C] = ld_rr;
-    instruction_noprefix[0x6D] = ld_rr;
-    instruction_noprefix[0x6E] = ld_rr;
-    instruction_noprefix[0x6F] = ld_rr;
+    // instruction_noprefix[0x60] = ld_rr;
+    // instruction_noprefix[0x61] = ld_rr;
+    // instruction_noprefix[0x62] = ld_rr;
+    // instruction_noprefix[0x63] = ld_rr;
+    // instruction_noprefix[0x64] = ld_rr;
+    // instruction_noprefix[0x65] = ld_rr;
+    // instruction_noprefix[0x66] = ld_rr;
+    // instruction_noprefix[0x67] = ld_rr;
+    // instruction_noprefix[0x68] = ld_rr;
+    // instruction_noprefix[0x69] = ld_rr;
+    // instruction_noprefix[0x6A] = ld_rr;
+    // instruction_noprefix[0x6B] = ld_rr;
+    // instruction_noprefix[0x6C] = ld_rr;
+    // instruction_noprefix[0x6D] = ld_rr;
+    // instruction_noprefix[0x6E] = ld_rr;
+    // instruction_noprefix[0x6F] = ld_rr;
 
-    instruction_noprefix[0x70] = ld_rr;
-    instruction_noprefix[0x71] = ld_rr;
-    instruction_noprefix[0x72] = ld_rr;
-    instruction_noprefix[0x73] = ld_rr;
-    instruction_noprefix[0x74] = ld_rr;
-    instruction_noprefix[0x75] = ld_rr;
-    instruction_noprefix[0x76] = halt;
-    instruction_noprefix[0x77] = ld_rr;
-    instruction_noprefix[0x78] = ld_rr;
-    instruction_noprefix[0x79] = ld_rr;
-    instruction_noprefix[0x7A] = ld_rr;
-    instruction_noprefix[0x7B] = ld_rr;
-    instruction_noprefix[0x7C] = ld_rr;
-    instruction_noprefix[0x7D] = ld_rr;
-    instruction_noprefix[0x7E] = ld_rr;
-    instruction_noprefix[0x7F] = ld_rr;
+    // instruction_noprefix[0x70] = ld_rr;
+    // instruction_noprefix[0x71] = ld_rr;
+    // instruction_noprefix[0x72] = ld_rr;
+    // instruction_noprefix[0x73] = ld_rr;
+    // instruction_noprefix[0x74] = ld_rr;
+    // instruction_noprefix[0x75] = ld_rr;
+    // instruction_noprefix[0x76] = halt;
+    // instruction_noprefix[0x77] = ld_rr;
+    // instruction_noprefix[0x78] = ld_rr;
+    // instruction_noprefix[0x79] = ld_rr;
+    // instruction_noprefix[0x7A] = ld_rr;
+    // instruction_noprefix[0x7B] = ld_rr;
+    // instruction_noprefix[0x7C] = ld_rr;
+    // instruction_noprefix[0x7D] = ld_rr;
+    // instruction_noprefix[0x7E] = ld_rr;
+    // instruction_noprefix[0x7F] = ld_rr;
 
-    instruction_noprefix[0x80] = add_ar;
-    instruction_noprefix[0x81] = add_ar;
-    instruction_noprefix[0x82] = add_ar;
-    instruction_noprefix[0x83] = add_ar;
-    instruction_noprefix[0x84] = add_ar;
-    instruction_noprefix[0x85] = add_ar;
-    instruction_noprefix[0x86] = add_ar;
-    instruction_noprefix[0x87] = add_ar;
-    instruction_noprefix[0x88] = adc_ar;
-    instruction_noprefix[0x89] = adc_ar;
-    instruction_noprefix[0x8A] = adc_ar;
-    instruction_noprefix[0x8B] = adc_ar;
-    instruction_noprefix[0x8C] = adc_ar;
-    instruction_noprefix[0x8D] = adc_ar;
-    instruction_noprefix[0x8E] = adc_ar;
-    instruction_noprefix[0x8F] = adc_ar;
+    // instruction_noprefix[0x80] = add_ar;
+    // instruction_noprefix[0x81] = add_ar;
+    // instruction_noprefix[0x82] = add_ar;
+    // instruction_noprefix[0x83] = add_ar;
+    // instruction_noprefix[0x84] = add_ar;
+    // instruction_noprefix[0x85] = add_ar;
+    // instruction_noprefix[0x86] = add_ar;
+    // instruction_noprefix[0x87] = add_ar;
+    // instruction_noprefix[0x88] = adc_ar;
+    // instruction_noprefix[0x89] = adc_ar;
+    // instruction_noprefix[0x8A] = adc_ar;
+    // instruction_noprefix[0x8B] = adc_ar;
+    // instruction_noprefix[0x8C] = adc_ar;
+    // instruction_noprefix[0x8D] = adc_ar;
+    // instruction_noprefix[0x8E] = adc_ar;
+    // instruction_noprefix[0x8F] = adc_ar;
 
-    instruction_noprefix[0x90] = sub_ar;
-    instruction_noprefix[0x91] = sub_ar;
-    instruction_noprefix[0x92] = sub_ar;
-    instruction_noprefix[0x93] = sub_ar;
-    instruction_noprefix[0x94] = sub_ar;
-    instruction_noprefix[0x95] = sub_ar;
-    instruction_noprefix[0x96] = sub_ar;
-    instruction_noprefix[0x97] = sub_ar;
-    instruction_noprefix[0x98] = sbc_ar;
-    instruction_noprefix[0x99] = sbc_ar;
-    instruction_noprefix[0x9A] = sbc_ar;
-    instruction_noprefix[0x9B] = sbc_ar;
-    instruction_noprefix[0x9C] = sbc_ar;
-    instruction_noprefix[0x9D] = sbc_ar;
-    instruction_noprefix[0x9E] = sbc_ar;
-    instruction_noprefix[0x9F] = sbc_ar;
+    // instruction_noprefix[0x90] = sub_ar;
+    // instruction_noprefix[0x91] = sub_ar;
+    // instruction_noprefix[0x92] = sub_ar;
+    // instruction_noprefix[0x93] = sub_ar;
+    // instruction_noprefix[0x94] = sub_ar;
+    // instruction_noprefix[0x95] = sub_ar;
+    // instruction_noprefix[0x96] = sub_ar;
+    // instruction_noprefix[0x97] = sub_ar;
+    // instruction_noprefix[0x98] = sbc_ar;
+    // instruction_noprefix[0x99] = sbc_ar;
+    // instruction_noprefix[0x9A] = sbc_ar;
+    // instruction_noprefix[0x9B] = sbc_ar;
+    // instruction_noprefix[0x9C] = sbc_ar;
+    // instruction_noprefix[0x9D] = sbc_ar;
+    // instruction_noprefix[0x9E] = sbc_ar;
+    // instruction_noprefix[0x9F] = sbc_ar;
 
-    instruction_noprefix[0x90] = sub_ar;
-    instruction_noprefix[0x91] = sub_ar;
-    instruction_noprefix[0x92] = sub_ar;
-    instruction_noprefix[0x93] = sub_ar;
-    instruction_noprefix[0x94] = sub_ar;
-    instruction_noprefix[0x95] = sub_ar;
-    instruction_noprefix[0x96] = sub_ar;
-    instruction_noprefix[0x97] = sub_ar;
-    instruction_noprefix[0x98] = sbc_ar;
-    instruction_noprefix[0x99] = sbc_ar;
-    instruction_noprefix[0x9A] = sbc_ar;
-    instruction_noprefix[0x9B] = sbc_ar;
-    instruction_noprefix[0x9C] = sbc_ar;
-    instruction_noprefix[0x9D] = sbc_ar;
-    instruction_noprefix[0x9E] = sbc_ar;
-    instruction_noprefix[0x9F] = sbc_ar;
+    // instruction_noprefix[0x90] = sub_ar;
+    // instruction_noprefix[0x91] = sub_ar;
+    // instruction_noprefix[0x92] = sub_ar;
+    // instruction_noprefix[0x93] = sub_ar;
+    // instruction_noprefix[0x94] = sub_ar;
+    // instruction_noprefix[0x95] = sub_ar;
+    // instruction_noprefix[0x96] = sub_ar;
+    // instruction_noprefix[0x97] = sub_ar;
+    // instruction_noprefix[0x98] = sbc_ar;
+    // instruction_noprefix[0x99] = sbc_ar;
+    // instruction_noprefix[0x9A] = sbc_ar;
+    // instruction_noprefix[0x9B] = sbc_ar;
+    // instruction_noprefix[0x9C] = sbc_ar;
+    // instruction_noprefix[0x9D] = sbc_ar;
+    // instruction_noprefix[0x9E] = sbc_ar;
+    // instruction_noprefix[0x9F] = sbc_ar;
 
-    instruction_noprefix[0xA0] = and_ar;
-    instruction_noprefix[0xA1] = and_ar;
-    instruction_noprefix[0xA2] = and_ar;
-    instruction_noprefix[0xA3] = and_ar;
-    instruction_noprefix[0xA4] = and_ar;
-    instruction_noprefix[0xA5] = and_ar;
-    instruction_noprefix[0xA6] = and_ar;
-    instruction_noprefix[0xA7] = and_ar;
-    instruction_noprefix[0xA8] = xor_ar;
-    instruction_noprefix[0xA9] = xor_ar;
-    instruction_noprefix[0xAA] = xor_ar;
-    instruction_noprefix[0xAB] = xor_ar;
-    instruction_noprefix[0xAC] = xor_ar;
-    instruction_noprefix[0xAD] = xor_ar;
-    instruction_noprefix[0xAE] = xor_ar;
-    instruction_noprefix[0xAF] = xor_ar;
+    // instruction_noprefix[0xA0] = and_ar;
+    // instruction_noprefix[0xA1] = and_ar;
+    // instruction_noprefix[0xA2] = and_ar;
+    // instruction_noprefix[0xA3] = and_ar;
+    // instruction_noprefix[0xA4] = and_ar;
+    // instruction_noprefix[0xA5] = and_ar;
+    // instruction_noprefix[0xA6] = and_ar;
+    // instruction_noprefix[0xA7] = and_ar;
+    // instruction_noprefix[0xA8] = xor_ar;
+    // instruction_noprefix[0xA9] = xor_ar;
+    // instruction_noprefix[0xAA] = xor_ar;
+    // instruction_noprefix[0xAB] = xor_ar;
+    // instruction_noprefix[0xAC] = xor_ar;
+    // instruction_noprefix[0xAD] = xor_ar;
+    // instruction_noprefix[0xAE] = xor_ar;
+    // instruction_noprefix[0xAF] = xor_ar;
 
-    instruction_noprefix[0xB0] = or_ar;
-    instruction_noprefix[0xB1] = or_ar;
-    instruction_noprefix[0xB2] = or_ar;
-    instruction_noprefix[0xB3] = or_ar;
-    instruction_noprefix[0xB4] = or_ar;
-    instruction_noprefix[0xB5] = or_ar;
-    instruction_noprefix[0xB6] = or_ar;
-    instruction_noprefix[0xB7] = or_ar;
-    instruction_noprefix[0xB8] = cp_ar;
-    instruction_noprefix[0xB9] = cp_ar;
-    instruction_noprefix[0xBA] = cp_ar;
-    instruction_noprefix[0xBB] = cp_ar;
-    instruction_noprefix[0xBC] = cp_ar;
-    instruction_noprefix[0xBD] = cp_ar;
-    instruction_noprefix[0xBE] = cp_ar;
-    instruction_noprefix[0xBF] = cp_ar;
+    // instruction_noprefix[0xB0] = or_ar;
+    // instruction_noprefix[0xB1] = or_ar;
+    // instruction_noprefix[0xB2] = or_ar;
+    // instruction_noprefix[0xB3] = or_ar;
+    // instruction_noprefix[0xB4] = or_ar;
+    // instruction_noprefix[0xB5] = or_ar;
+    // instruction_noprefix[0xB6] = or_ar;
+    // instruction_noprefix[0xB7] = or_ar;
+    // instruction_noprefix[0xB8] = cp_ar;
+    // instruction_noprefix[0xB9] = cp_ar;
+    // instruction_noprefix[0xBA] = cp_ar;
+    // instruction_noprefix[0xBB] = cp_ar;
+    // instruction_noprefix[0xBC] = cp_ar;
+    // instruction_noprefix[0xBD] = cp_ar;
+    // instruction_noprefix[0xBE] = cp_ar;
+    // instruction_noprefix[0xBF] = cp_ar;
 
-    // impl me
-    instruction_noprefix[0xC0] = ret;
-    instruction_noprefix[0xC1] = ret;
-    instruction_noprefix[0xC2] = ret;
-    instruction_noprefix[0xC3] = ret;
-    instruction_noprefix[0xC4] = ret;
-    instruction_noprefix[0xC5] = ret;
-    instruction_noprefix[0xC6] = ret;
-    instruction_noprefix[0xC7] = ret;
-    instruction_noprefix[0xC8] = cp_ar;
-    instruction_noprefix[0xC9] = cp_ar;
-    instruction_noprefix[0xCA] = cp_ar;
-    instruction_noprefix[0xCB] = cp_ar; // cb prefixed
-    instruction_noprefix[0xCC] = cp_ar;
-    instruction_noprefix[0xCD] = cp_ar;
-    instruction_noprefix[0xCE] = cp_ar;
-    instruction_noprefix[0xCF] = cp_ar;
+    // // impl me
+    // instruction_noprefix[0xC0] = ret;
+    // instruction_noprefix[0xC1] = ret;
+    // instruction_noprefix[0xC2] = ret;
+    // instruction_noprefix[0xC3] = ret;
+    // instruction_noprefix[0xC4] = ret;
+    // instruction_noprefix[0xC5] = ret;
+    // instruction_noprefix[0xC6] = ret;
+    // instruction_noprefix[0xC7] = ret;
+    // instruction_noprefix[0xC8] = cp_ar;
+    // instruction_noprefix[0xC9] = cp_ar;
+    // instruction_noprefix[0xCA] = cp_ar;
+    // instruction_noprefix[0xCB] = cp_ar; // cb prefixed
+    // instruction_noprefix[0xCC] = cp_ar;
+    // instruction_noprefix[0xCD] = cp_ar;
+    // instruction_noprefix[0xCE] = cp_ar;
+    // instruction_noprefix[0xCF] = cp_ar;
 
-    instruction_noprefix[0xD0] = ret;
-    instruction_noprefix[0xD1] = ret;
-    instruction_noprefix[0xD2] = ret;
-    instruction_noprefix[0xD3] = ret;
-    instruction_noprefix[0xD4] = ret;
-    instruction_noprefix[0xD5] = ret;
-    instruction_noprefix[0xD6] = ret;
-    instruction_noprefix[0xD7] = ret;
-    instruction_noprefix[0xD8] = cp_ar;
-    instruction_noprefix[0xD9] = cp_ar;
-    instruction_noprefix[0xDA] = cp_ar;
-    instruction_noprefix[0xDB] = cp_ar; // cb prefixed
-    instruction_noprefix[0xDC] = cp_ar;
-    instruction_noprefix[0xDD] = cp_ar;
-    instruction_noprefix[0xDE] = cp_ar;
-    instruction_noprefix[0xDF] = cp_ar;
+    // instruction_noprefix[0xD0] = ret;
+    // instruction_noprefix[0xD1] = ret;
+    // instruction_noprefix[0xD2] = ret;
+    // instruction_noprefix[0xD3] = ret;
+    // instruction_noprefix[0xD4] = ret;
+    // instruction_noprefix[0xD5] = ret;
+    // instruction_noprefix[0xD6] = ret;
+    // instruction_noprefix[0xD7] = ret;
+    // instruction_noprefix[0xD8] = cp_ar;
+    // instruction_noprefix[0xD9] = cp_ar;
+    // instruction_noprefix[0xDA] = cp_ar;
+    // instruction_noprefix[0xDB] = cp_ar; // cb prefixed
+    // instruction_noprefix[0xDC] = cp_ar;
+    // instruction_noprefix[0xDD] = cp_ar;
+    // instruction_noprefix[0xDE] = cp_ar;
+    // instruction_noprefix[0xDF] = cp_ar;
 
-    instruction_noprefix[0xE0] = ret;
-    instruction_noprefix[0xE1] = ret;
-    instruction_noprefix[0xE2] = ret;
-    instruction_noprefix[0xE3] = ret;
-    instruction_noprefix[0xE4] = ret;
-    instruction_noprefix[0xE5] = ret;
-    instruction_noprefix[0xE6] = ret;
-    instruction_noprefix[0xE7] = ret;
-    instruction_noprefix[0xE8] = cp_ar;
-    instruction_noprefix[0xE9] = cp_ar;
-    instruction_noprefix[0xEA] = cp_ar;
-    instruction_noprefix[0xEB] = cp_ar; // cb prefixed
-    instruction_noprefix[0xEC] = cp_ar;
-    instruction_noprefix[0xED] = cp_ar;
-    instruction_noprefix[0xEE] = cp_ar;
-    instruction_noprefix[0xEF] = cp_ar;
+    // instruction_noprefix[0xE0] = ret;
+    // instruction_noprefix[0xE1] = ret;
+    // instruction_noprefix[0xE2] = ret;
+    // instruction_noprefix[0xE3] = ret;
+    // instruction_noprefix[0xE4] = ret;
+    // instruction_noprefix[0xE5] = ret;
+    // instruction_noprefix[0xE6] = ret;
+    // instruction_noprefix[0xE7] = ret;
+    // instruction_noprefix[0xE8] = cp_ar;
+    // instruction_noprefix[0xE9] = cp_ar;
+    // instruction_noprefix[0xEA] = cp_ar;
+    // instruction_noprefix[0xEB] = cp_ar; // cb prefixed
+    // instruction_noprefix[0xEC] = cp_ar;
+    // instruction_noprefix[0xED] = cp_ar;
+    // instruction_noprefix[0xEE] = cp_ar;
+    // instruction_noprefix[0xEF] = cp_ar;
 
-    instruction_noprefix[0xF0] = ret;
-    instruction_noprefix[0xF1] = ret;
-    instruction_noprefix[0xF2] = ret;
-    instruction_noprefix[0xF3] = ret;
-    instruction_noprefix[0xF4] = ret;
-    instruction_noprefix[0xF5] = ret;
-    instruction_noprefix[0xF6] = ret;
-    instruction_noprefix[0xF7] = ret;
-    instruction_noprefix[0xF8] = cp_ar;
-    instruction_noprefix[0xF9] = cp_ar;
-    instruction_noprefix[0xFA] = cp_ar;
-    instruction_noprefix[0xFB] = cp_ar; // cb prefixed
-    instruction_noprefix[0xFC] = cp_ar;
-    instruction_noprefix[0xFD] = cp_ar;
-    instruction_noprefix[0xFE] = cp_ar;
-    instruction_noprefix[0xFF] = cp_ar;
+    // instruction_noprefix[0xF0] = ret;
+    // instruction_noprefix[0xF1] = ret;
+    // instruction_noprefix[0xF2] = ret;
+    // instruction_noprefix[0xF3] = ret;
+    // instruction_noprefix[0xF4] = ret;
+    // instruction_noprefix[0xF5] = ret;
+    // instruction_noprefix[0xF6] = ret;
+    // instruction_noprefix[0xF7] = ret;
+    // instruction_noprefix[0xF8] = cp_ar;
+    // instruction_noprefix[0xF9] = cp_ar;
+    // instruction_noprefix[0xFA] = cp_ar;
+    // instruction_noprefix[0xFB] = cp_ar; // cb prefixed
+    // instruction_noprefix[0xFC] = cp_ar;
+    // instruction_noprefix[0xFD] = cp_ar;
+    // instruction_noprefix[0xFE] = cp_ar;
+    // instruction_noprefix[0xFF] = cp_ar;
 
-    // CB prefixed
-    instruction_cbprefix[0x00] = nop;
-    instruction_cbprefix[0x01] = ld_rrnn;
-    instruction_cbprefix[0x02] = ld_bca;
-    instruction_cbprefix[0x03] = inc_rr;
-    instruction_cbprefix[0x04] = inc_r;
-    instruction_cbprefix[0x05] = dec_r;
-    instruction_cbprefix[0x06] = ld_rn;
-    instruction_cbprefix[0x07] = rlc_r;
-    instruction_cbprefix[0x08] = ld_nnsp;
-    instruction_cbprefix[0x09] = add_hlrr;
-    instruction_cbprefix[0x0A] = ld_abc;
-    instruction_cbprefix[0x0B] = dec_rr;
-    instruction_cbprefix[0x0C] = inc_r;
-    instruction_cbprefix[0x0D] = dec_r;
-    instruction_cbprefix[0x0E] = ld_rn;
-    instruction_cbprefix[0x0F] = rrc_r;
+    // // CB prefixed
+    // instruction_cbprefix[0x00] = nop;
+    // instruction_cbprefix[0x01] = ld_rrnn;
+    // instruction_cbprefix[0x02] = ld_bca;
+    // instruction_cbprefix[0x03] = inc_rr;
+    // instruction_cbprefix[0x04] = inc_r;
+    // instruction_cbprefix[0x05] = dec_r;
+    // instruction_cbprefix[0x06] = ld_rn;
+    // instruction_cbprefix[0x07] = rlc_r;
+    // instruction_cbprefix[0x08] = ld_nnsp;
+    // instruction_cbprefix[0x09] = add_hlrr;
+    // instruction_cbprefix[0x0A] = ld_abc;
+    // instruction_cbprefix[0x0B] = dec_rr;
+    // instruction_cbprefix[0x0C] = inc_r;
+    // instruction_cbprefix[0x0D] = dec_r;
+    // instruction_cbprefix[0x0E] = ld_rn;
+    // instruction_cbprefix[0x0F] = rrc_r;
 
-    instruction_cbprefix[0x10] = stop;
-    instruction_cbprefix[0x11] = ld_rrnn;
-    instruction_cbprefix[0x12] = ld_dea;
-    instruction_cbprefix[0x13] = inc_rr;
-    instruction_cbprefix[0x14] = inc_r;
-    instruction_cbprefix[0x15] = dec_r;
-    instruction_cbprefix[0x16] = ld_rn;
-    instruction_cbprefix[0x17] = rla;
-    instruction_cbprefix[0x18]; // implement me
-    instruction_cbprefix[0x19] = add_hlrr;
-    instruction_cbprefix[0x1A] = ld_ade;
-    instruction_cbprefix[0x1B] = dec_rr;
-    instruction_cbprefix[0x1C] = inc_r;
-    instruction_cbprefix[0x1D] = dec_r;
-    instruction_cbprefix[0x1E] = ld_rn;
-    instruction_cbprefix[0x1F] = rra;
+    // instruction_cbprefix[0x10] = stop;
+    // instruction_cbprefix[0x11] = ld_rrnn;
+    // instruction_cbprefix[0x12] = ld_dea;
+    // instruction_cbprefix[0x13] = inc_rr;
+    // instruction_cbprefix[0x14] = inc_r;
+    // instruction_cbprefix[0x15] = dec_r;
+    // instruction_cbprefix[0x16] = ld_rn;
+    // instruction_cbprefix[0x17] = rla;
+    // instruction_cbprefix[0x18]; // implement me
+    // instruction_cbprefix[0x19] = add_hlrr;
+    // instruction_cbprefix[0x1A] = ld_ade;
+    // instruction_cbprefix[0x1B] = dec_rr;
+    // instruction_cbprefix[0x1C] = inc_r;
+    // instruction_cbprefix[0x1D] = dec_r;
+    // instruction_cbprefix[0x1E] = ld_rn;
+    // instruction_cbprefix[0x1F] = rra;
 
-    instruction_cbprefix[0x20]; // impl me
-    instruction_cbprefix[0x21] = ld_rrnn;
-    instruction_cbprefix[0x22] = ldi_hla;
-    instruction_cbprefix[0x23] = inc_hl;
-    instruction_cbprefix[0x24] = inc_r;
-    instruction_cbprefix[0x25] = dec_r;
-    instruction_cbprefix[0x26] = ld_rn;
-    instruction_cbprefix[0x27] = daa;
-    instruction_cbprefix[0x28]; // impl me
-    instruction_cbprefix[0x29] = add_hlrr;
-    instruction_cbprefix[0x2A] = ldi_ahl;
-    instruction_cbprefix[0x2B] = dec_rr;
-    instruction_cbprefix[0x2C] = inc_r;
-    instruction_cbprefix[0x2D] = dec_r;
-    instruction_cbprefix[0x2E] = ld_rn;
-    instruction_cbprefix[0x2F] = cpl;
+    // instruction_cbprefix[0x20]; // impl me
+    // instruction_cbprefix[0x21] = ld_rrnn;
+    // instruction_cbprefix[0x22] = ldi_hla;
+    // instruction_cbprefix[0x23] = inc_hl;
+    // instruction_cbprefix[0x24] = inc_r;
+    // instruction_cbprefix[0x25] = dec_r;
+    // instruction_cbprefix[0x26] = ld_rn;
+    // instruction_cbprefix[0x27] = daa;
+    // instruction_cbprefix[0x28]; // impl me
+    // instruction_cbprefix[0x29] = add_hlrr;
+    // instruction_cbprefix[0x2A] = ldi_ahl;
+    // instruction_cbprefix[0x2B] = dec_rr;
+    // instruction_cbprefix[0x2C] = inc_r;
+    // instruction_cbprefix[0x2D] = dec_r;
+    // instruction_cbprefix[0x2E] = ld_rn;
+    // instruction_cbprefix[0x2F] = cpl;
 
-    instruction_cbprefix[0x30]; // impl me
-    instruction_cbprefix[0x31] = ld_rrnn;
-    instruction_cbprefix[0x32] = ldd_hla;
-    instruction_cbprefix[0x33] = inc_rr;
-    instruction_cbprefix[0x34] = inc_hl;
-    instruction_cbprefix[0x35] = dec_hl;
-    instruction_cbprefix[0x36] = ld_hln;
-    instruction_cbprefix[0x37] = scf;
-    instruction_cbprefix[0x38]; // impl me
-    instruction_cbprefix[0x39] = add_hlrr;
-    instruction_cbprefix[0x3A] = ldd_ahl;
-    instruction_cbprefix[0x3B] = dec_rr;
-    instruction_cbprefix[0x3C] = inc_r;
-    instruction_cbprefix[0x3D] = dec_r;
-    instruction_cbprefix[0x3E] = ld_rn;
-    instruction_cbprefix[0x3F] = ccf;
+    // instruction_cbprefix[0x30]; // impl me
+    // instruction_cbprefix[0x31] = ld_rrnn;
+    // instruction_cbprefix[0x32] = ldd_hla;
+    // instruction_cbprefix[0x33] = inc_rr;
+    // instruction_cbprefix[0x34] = inc_hl;
+    // instruction_cbprefix[0x35] = dec_hl;
+    // instruction_cbprefix[0x36] = ld_hln;
+    // instruction_cbprefix[0x37] = scf;
+    // instruction_cbprefix[0x38]; // impl me
+    // instruction_cbprefix[0x39] = add_hlrr;
+    // instruction_cbprefix[0x3A] = ldd_ahl;
+    // instruction_cbprefix[0x3B] = dec_rr;
+    // instruction_cbprefix[0x3C] = inc_r;
+    // instruction_cbprefix[0x3D] = dec_r;
+    // instruction_cbprefix[0x3E] = ld_rn;
+    // instruction_cbprefix[0x3F] = ccf;
 
-    instruction_cbprefix[0x40] = ld_rr;
-    instruction_cbprefix[0x41] = ld_rr;
-    instruction_cbprefix[0x42] = ld_rr;
-    instruction_cbprefix[0x43] = ld_rr;
-    instruction_cbprefix[0x44] = ld_rr;
-    instruction_cbprefix[0x45] = ld_rr;
-    instruction_cbprefix[0x46] = ld_rr;
-    instruction_cbprefix[0x47] = ld_rr;
-    instruction_cbprefix[0x48] = ld_rr;
-    instruction_cbprefix[0x49] = ld_rr;
-    instruction_cbprefix[0x4A] = ld_rr;
-    instruction_cbprefix[0x4B] = ld_rr;
-    instruction_cbprefix[0x4C] = ld_rr;
-    instruction_cbprefix[0x4D] = ld_rr;
-    instruction_cbprefix[0x4E] = ld_rr;
-    instruction_cbprefix[0x4F] = ld_rr;
+    // instruction_cbprefix[0x40] = ld_rr;
+    // instruction_cbprefix[0x41] = ld_rr;
+    // instruction_cbprefix[0x42] = ld_rr;
+    // instruction_cbprefix[0x43] = ld_rr;
+    // instruction_cbprefix[0x44] = ld_rr;
+    // instruction_cbprefix[0x45] = ld_rr;
+    // instruction_cbprefix[0x46] = ld_rr;
+    // instruction_cbprefix[0x47] = ld_rr;
+    // instruction_cbprefix[0x48] = ld_rr;
+    // instruction_cbprefix[0x49] = ld_rr;
+    // instruction_cbprefix[0x4A] = ld_rr;
+    // instruction_cbprefix[0x4B] = ld_rr;
+    // instruction_cbprefix[0x4C] = ld_rr;
+    // instruction_cbprefix[0x4D] = ld_rr;
+    // instruction_cbprefix[0x4E] = ld_rr;
+    // instruction_cbprefix[0x4F] = ld_rr;
 
-    instruction_cbprefix[0x50] = ld_rr;
-    instruction_cbprefix[0x51] = ld_rr;
-    instruction_cbprefix[0x52] = ld_rr;
-    instruction_cbprefix[0x53] = ld_rr;
-    instruction_cbprefix[0x54] = ld_rr;
-    instruction_cbprefix[0x55] = ld_rr;
-    instruction_cbprefix[0x56] = ld_rr;
-    instruction_cbprefix[0x57] = ld_rr;
-    instruction_cbprefix[0x58] = ld_rr;
-    instruction_cbprefix[0x59] = ld_rr;
-    instruction_cbprefix[0x5A] = ld_rr;
-    instruction_cbprefix[0x5B] = ld_rr;
-    instruction_cbprefix[0x5C] = ld_rr;
-    instruction_cbprefix[0x5D] = ld_rr;
-    instruction_cbprefix[0x5E] = ld_rr;
-    instruction_cbprefix[0x5F] = ld_rr;
+    // instruction_cbprefix[0x50] = ld_rr;
+    // instruction_cbprefix[0x51] = ld_rr;
+    // instruction_cbprefix[0x52] = ld_rr;
+    // instruction_cbprefix[0x53] = ld_rr;
+    // instruction_cbprefix[0x54] = ld_rr;
+    // instruction_cbprefix[0x55] = ld_rr;
+    // instruction_cbprefix[0x56] = ld_rr;
+    // instruction_cbprefix[0x57] = ld_rr;
+    // instruction_cbprefix[0x58] = ld_rr;
+    // instruction_cbprefix[0x59] = ld_rr;
+    // instruction_cbprefix[0x5A] = ld_rr;
+    // instruction_cbprefix[0x5B] = ld_rr;
+    // instruction_cbprefix[0x5C] = ld_rr;
+    // instruction_cbprefix[0x5D] = ld_rr;
+    // instruction_cbprefix[0x5E] = ld_rr;
+    // instruction_cbprefix[0x5F] = ld_rr;
 
-    instruction_cbprefix[0x60] = ld_rr;
-    instruction_cbprefix[0x61] = ld_rr;
-    instruction_cbprefix[0x62] = ld_rr;
-    instruction_cbprefix[0x63] = ld_rr;
-    instruction_cbprefix[0x64] = ld_rr;
-    instruction_cbprefix[0x65] = ld_rr;
-    instruction_cbprefix[0x66] = ld_rr;
-    instruction_cbprefix[0x67] = ld_rr;
-    instruction_cbprefix[0x68] = ld_rr;
-    instruction_cbprefix[0x69] = ld_rr;
-    instruction_cbprefix[0x6A] = ld_rr;
-    instruction_cbprefix[0x6B] = ld_rr;
-    instruction_cbprefix[0x6C] = ld_rr;
-    instruction_cbprefix[0x6D] = ld_rr;
-    instruction_cbprefix[0x6E] = ld_rr;
-    instruction_cbprefix[0x6F] = ld_rr;
+    // instruction_cbprefix[0x60] = ld_rr;
+    // instruction_cbprefix[0x61] = ld_rr;
+    // instruction_cbprefix[0x62] = ld_rr;
+    // instruction_cbprefix[0x63] = ld_rr;
+    // instruction_cbprefix[0x64] = ld_rr;
+    // instruction_cbprefix[0x65] = ld_rr;
+    // instruction_cbprefix[0x66] = ld_rr;
+    // instruction_cbprefix[0x67] = ld_rr;
+    // instruction_cbprefix[0x68] = ld_rr;
+    // instruction_cbprefix[0x69] = ld_rr;
+    // instruction_cbprefix[0x6A] = ld_rr;
+    // instruction_cbprefix[0x6B] = ld_rr;
+    // instruction_cbprefix[0x6C] = ld_rr;
+    // instruction_cbprefix[0x6D] = ld_rr;
+    // instruction_cbprefix[0x6E] = ld_rr;
+    // instruction_cbprefix[0x6F] = ld_rr;
 
-    instruction_cbprefix[0x70] = ld_rr;
-    instruction_cbprefix[0x71] = ld_rr;
-    instruction_cbprefix[0x72] = ld_rr;
-    instruction_cbprefix[0x73] = ld_rr;
-    instruction_cbprefix[0x74] = ld_rr;
-    instruction_cbprefix[0x75] = ld_rr;
-    instruction_cbprefix[0x76] = halt;
-    instruction_cbprefix[0x77] = ld_rr;
-    instruction_cbprefix[0x78] = ld_rr;
-    instruction_cbprefix[0x79] = ld_rr;
-    instruction_cbprefix[0x7A] = ld_rr;
-    instruction_cbprefix[0x7B] = ld_rr;
-    instruction_cbprefix[0x7C] = ld_rr;
-    instruction_cbprefix[0x7D] = ld_rr;
-    instruction_cbprefix[0x7E] = ld_rr;
-    instruction_cbprefix[0x7F] = ld_rr;
+    // instruction_cbprefix[0x70] = ld_rr;
+    // instruction_cbprefix[0x71] = ld_rr;
+    // instruction_cbprefix[0x72] = ld_rr;
+    // instruction_cbprefix[0x73] = ld_rr;
+    // instruction_cbprefix[0x74] = ld_rr;
+    // instruction_cbprefix[0x75] = ld_rr;
+    // instruction_cbprefix[0x76] = halt;
+    // instruction_cbprefix[0x77] = ld_rr;
+    // instruction_cbprefix[0x78] = ld_rr;
+    // instruction_cbprefix[0x79] = ld_rr;
+    // instruction_cbprefix[0x7A] = ld_rr;
+    // instruction_cbprefix[0x7B] = ld_rr;
+    // instruction_cbprefix[0x7C] = ld_rr;
+    // instruction_cbprefix[0x7D] = ld_rr;
+    // instruction_cbprefix[0x7E] = ld_rr;
+    // instruction_cbprefix[0x7F] = ld_rr;
 
-    instruction_cbprefix[0x80] = add_ar;
-    instruction_cbprefix[0x81] = add_ar;
-    instruction_cbprefix[0x82] = add_ar;
-    instruction_cbprefix[0x83] = add_ar;
-    instruction_cbprefix[0x84] = add_ar;
-    instruction_cbprefix[0x85] = add_ar;
-    instruction_cbprefix[0x86] = add_ar;
-    instruction_cbprefix[0x87] = add_ar;
-    instruction_cbprefix[0x88] = adc_ar;
-    instruction_cbprefix[0x89] = adc_ar;
-    instruction_cbprefix[0x8A] = adc_ar;
-    instruction_cbprefix[0x8B] = adc_ar;
-    instruction_cbprefix[0x8C] = adc_ar;
-    instruction_cbprefix[0x8D] = adc_ar;
-    instruction_cbprefix[0x8E] = adc_ar;
-    instruction_cbprefix[0x8F] = adc_ar;
+    // instruction_cbprefix[0x80] = add_ar;
+    // instruction_cbprefix[0x81] = add_ar;
+    // instruction_cbprefix[0x82] = add_ar;
+    // instruction_cbprefix[0x83] = add_ar;
+    // instruction_cbprefix[0x84] = add_ar;
+    // instruction_cbprefix[0x85] = add_ar;
+    // instruction_cbprefix[0x86] = add_ar;
+    // instruction_cbprefix[0x87] = add_ar;
+    // instruction_cbprefix[0x88] = adc_ar;
+    // instruction_cbprefix[0x89] = adc_ar;
+    // instruction_cbprefix[0x8A] = adc_ar;
+    // instruction_cbprefix[0x8B] = adc_ar;
+    // instruction_cbprefix[0x8C] = adc_ar;
+    // instruction_cbprefix[0x8D] = adc_ar;
+    // instruction_cbprefix[0x8E] = adc_ar;
+    // instruction_cbprefix[0x8F] = adc_ar;
 
-    instruction_cbprefix[0x90] = sub_ar;
-    instruction_cbprefix[0x91] = sub_ar;
-    instruction_cbprefix[0x92] = sub_ar;
-    instruction_cbprefix[0x93] = sub_ar;
-    instruction_cbprefix[0x94] = sub_ar;
-    instruction_cbprefix[0x95] = sub_ar;
-    instruction_cbprefix[0x96] = sub_ar;
-    instruction_cbprefix[0x97] = sub_ar;
-    instruction_cbprefix[0x98] = sbc_ar;
-    instruction_cbprefix[0x99] = sbc_ar;
-    instruction_cbprefix[0x9A] = sbc_ar;
-    instruction_cbprefix[0x9B] = sbc_ar;
-    instruction_cbprefix[0x9C] = sbc_ar;
-    instruction_cbprefix[0x9D] = sbc_ar;
-    instruction_cbprefix[0x9E] = sbc_ar;
-    instruction_cbprefix[0x9F] = sbc_ar;
+    // instruction_cbprefix[0x90] = sub_ar;
+    // instruction_cbprefix[0x91] = sub_ar;
+    // instruction_cbprefix[0x92] = sub_ar;
+    // instruction_cbprefix[0x93] = sub_ar;
+    // instruction_cbprefix[0x94] = sub_ar;
+    // instruction_cbprefix[0x95] = sub_ar;
+    // instruction_cbprefix[0x96] = sub_ar;
+    // instruction_cbprefix[0x97] = sub_ar;
+    // instruction_cbprefix[0x98] = sbc_ar;
+    // instruction_cbprefix[0x99] = sbc_ar;
+    // instruction_cbprefix[0x9A] = sbc_ar;
+    // instruction_cbprefix[0x9B] = sbc_ar;
+    // instruction_cbprefix[0x9C] = sbc_ar;
+    // instruction_cbprefix[0x9D] = sbc_ar;
+    // instruction_cbprefix[0x9E] = sbc_ar;
+    // instruction_cbprefix[0x9F] = sbc_ar;
 
-    instruction_cbprefix[0x90] = sub_ar;
-    instruction_cbprefix[0x91] = sub_ar;
-    instruction_cbprefix[0x92] = sub_ar;
-    instruction_cbprefix[0x93] = sub_ar;
-    instruction_cbprefix[0x94] = sub_ar;
-    instruction_cbprefix[0x95] = sub_ar;
-    instruction_cbprefix[0x96] = sub_ar;
-    instruction_cbprefix[0x97] = sub_ar;
-    instruction_cbprefix[0x98] = sbc_ar;
-    instruction_cbprefix[0x99] = sbc_ar;
-    instruction_cbprefix[0x9A] = sbc_ar;
-    instruction_cbprefix[0x9B] = sbc_ar;
-    instruction_cbprefix[0x9C] = sbc_ar;
-    instruction_cbprefix[0x9D] = sbc_ar;
-    instruction_cbprefix[0x9E] = sbc_ar;
-    instruction_cbprefix[0x9F] = sbc_ar;
+    // instruction_cbprefix[0x90] = sub_ar;
+    // instruction_cbprefix[0x91] = sub_ar;
+    // instruction_cbprefix[0x92] = sub_ar;
+    // instruction_cbprefix[0x93] = sub_ar;
+    // instruction_cbprefix[0x94] = sub_ar;
+    // instruction_cbprefix[0x95] = sub_ar;
+    // instruction_cbprefix[0x96] = sub_ar;
+    // instruction_cbprefix[0x97] = sub_ar;
+    // instruction_cbprefix[0x98] = sbc_ar;
+    // instruction_cbprefix[0x99] = sbc_ar;
+    // instruction_cbprefix[0x9A] = sbc_ar;
+    // instruction_cbprefix[0x9B] = sbc_ar;
+    // instruction_cbprefix[0x9C] = sbc_ar;
+    // instruction_cbprefix[0x9D] = sbc_ar;
+    // instruction_cbprefix[0x9E] = sbc_ar;
+    // instruction_cbprefix[0x9F] = sbc_ar;
 
-    instruction_cbprefix[0xA0] = and_ar;
-    instruction_cbprefix[0xA1] = and_ar;
-    instruction_cbprefix[0xA2] = and_ar;
-    instruction_cbprefix[0xA3] = and_ar;
-    instruction_cbprefix[0xA4] = and_ar;
-    instruction_cbprefix[0xA5] = and_ar;
-    instruction_cbprefix[0xA6] = and_ar;
-    instruction_cbprefix[0xA7] = and_ar;
-    instruction_cbprefix[0xA8] = xor_ar;
-    instruction_cbprefix[0xA9] = xor_ar;
-    instruction_cbprefix[0xAA] = xor_ar;
-    instruction_cbprefix[0xAB] = xor_ar;
-    instruction_cbprefix[0xAC] = xor_ar;
-    instruction_cbprefix[0xAD] = xor_ar;
-    instruction_cbprefix[0xAE] = xor_ar;
-    instruction_cbprefix[0xAF] = xor_ar;
+    // instruction_cbprefix[0xA0] = and_ar;
+    // instruction_cbprefix[0xA1] = and_ar;
+    // instruction_cbprefix[0xA2] = and_ar;
+    // instruction_cbprefix[0xA3] = and_ar;
+    // instruction_cbprefix[0xA4] = and_ar;
+    // instruction_cbprefix[0xA5] = and_ar;
+    // instruction_cbprefix[0xA6] = and_ar;
+    // instruction_cbprefix[0xA7] = and_ar;
+    // instruction_cbprefix[0xA8] = xor_ar;
+    // instruction_cbprefix[0xA9] = xor_ar;
+    // instruction_cbprefix[0xAA] = xor_ar;
+    // instruction_cbprefix[0xAB] = xor_ar;
+    // instruction_cbprefix[0xAC] = xor_ar;
+    // instruction_cbprefix[0xAD] = xor_ar;
+    // instruction_cbprefix[0xAE] = xor_ar;
+    // instruction_cbprefix[0xAF] = xor_ar;
 
-    instruction_cbprefix[0xB0] = or_ar;
-    instruction_cbprefix[0xB1] = or_ar;
-    instruction_cbprefix[0xB2] = or_ar;
-    instruction_cbprefix[0xB3] = or_ar;
-    instruction_cbprefix[0xB4] = or_ar;
-    instruction_cbprefix[0xB5] = or_ar;
-    instruction_cbprefix[0xB6] = or_ar;
-    instruction_cbprefix[0xB7] = or_ar;
-    instruction_cbprefix[0xB8] = cp_ar;
-    instruction_cbprefix[0xB9] = cp_ar;
-    instruction_cbprefix[0xBA] = cp_ar;
-    instruction_cbprefix[0xBB] = cp_ar;
-    instruction_cbprefix[0xBC] = cp_ar;
-    instruction_cbprefix[0xBD] = cp_ar;
-    instruction_cbprefix[0xBE] = cp_ar;
-    instruction_cbprefix[0xBF] = cp_ar;
+    // instruction_cbprefix[0xB0] = or_ar;
+    // instruction_cbprefix[0xB1] = or_ar;
+    // instruction_cbprefix[0xB2] = or_ar;
+    // instruction_cbprefix[0xB3] = or_ar;
+    // instruction_cbprefix[0xB4] = or_ar;
+    // instruction_cbprefix[0xB5] = or_ar;
+    // instruction_cbprefix[0xB6] = or_ar;
+    // instruction_cbprefix[0xB7] = or_ar;
+    // instruction_cbprefix[0xB8] = cp_ar;
+    // instruction_cbprefix[0xB9] = cp_ar;
+    // instruction_cbprefix[0xBA] = cp_ar;
+    // instruction_cbprefix[0xBB] = cp_ar;
+    // instruction_cbprefix[0xBC] = cp_ar;
+    // instruction_cbprefix[0xBD] = cp_ar;
+    // instruction_cbprefix[0xBE] = cp_ar;
+    // instruction_cbprefix[0xBF] = cp_ar;
 
-    // impl me
-    instruction_cbprefix[0xC0] = ret;
-    instruction_cbprefix[0xC1] = ret;
-    instruction_cbprefix[0xC2] = ret;
-    instruction_cbprefix[0xC3] = ret;
-    instruction_cbprefix[0xC4] = ret;
-    instruction_cbprefix[0xC5] = ret;
-    instruction_cbprefix[0xC6] = ret;
-    instruction_cbprefix[0xC7] = ret;
-    instruction_cbprefix[0xC8] = cp_ar;
-    instruction_cbprefix[0xC9] = cp_ar;
-    instruction_cbprefix[0xCA] = cp_ar;
-    instruction_cbprefix[0xCB] = cp_ar; // cb prefixed
-    instruction_cbprefix[0xCC] = cp_ar;
-    instruction_cbprefix[0xCD] = cp_ar;
-    instruction_cbprefix[0xCE] = cp_ar;
-    instruction_cbprefix[0xCF] = cp_ar;
+    // // impl me
+    // instruction_cbprefix[0xC0] = ret;
+    // instruction_cbprefix[0xC1] = ret;
+    // instruction_cbprefix[0xC2] = ret;
+    // instruction_cbprefix[0xC3] = ret;
+    // instruction_cbprefix[0xC4] = ret;
+    // instruction_cbprefix[0xC5] = ret;
+    // instruction_cbprefix[0xC6] = ret;
+    // instruction_cbprefix[0xC7] = ret;
+    // instruction_cbprefix[0xC8] = cp_ar;
+    // instruction_cbprefix[0xC9] = cp_ar;
+    // instruction_cbprefix[0xCA] = cp_ar;
+    // instruction_cbprefix[0xCB] = cp_ar; // cb prefixed
+    // instruction_cbprefix[0xCC] = cp_ar;
+    // instruction_cbprefix[0xCD] = cp_ar;
+    // instruction_cbprefix[0xCE] = cp_ar;
+    // instruction_cbprefix[0xCF] = cp_ar;
 
-    instruction_cbprefix[0xD0] = ret;
-    instruction_cbprefix[0xD1] = ret;
-    instruction_cbprefix[0xD2] = ret;
-    instruction_cbprefix[0xD3] = ret;
-    instruction_cbprefix[0xD4] = ret;
-    instruction_cbprefix[0xD5] = ret;
-    instruction_cbprefix[0xD6] = ret;
-    instruction_cbprefix[0xD7] = ret;
-    instruction_cbprefix[0xD8] = cp_ar;
-    instruction_cbprefix[0xD9] = cp_ar;
-    instruction_cbprefix[0xDA] = cp_ar;
-    instruction_cbprefix[0xDB] = cp_ar; // cb prefixed
-    instruction_cbprefix[0xDC] = cp_ar;
-    instruction_cbprefix[0xDD] = cp_ar;
-    instruction_cbprefix[0xDE] = cp_ar;
-    instruction_cbprefix[0xDF] = cp_ar;
+    // instruction_cbprefix[0xD0] = ret;
+    // instruction_cbprefix[0xD1] = ret;
+    // instruction_cbprefix[0xD2] = ret;
+    // instruction_cbprefix[0xD3] = ret;
+    // instruction_cbprefix[0xD4] = ret;
+    // instruction_cbprefix[0xD5] = ret;
+    // instruction_cbprefix[0xD6] = ret;
+    // instruction_cbprefix[0xD7] = ret;
+    // instruction_cbprefix[0xD8] = cp_ar;
+    // instruction_cbprefix[0xD9] = cp_ar;
+    // instruction_cbprefix[0xDA] = cp_ar;
+    // instruction_cbprefix[0xDB] = cp_ar; // cb prefixed
+    // instruction_cbprefix[0xDC] = cp_ar;
+    // instruction_cbprefix[0xDD] = cp_ar;
+    // instruction_cbprefix[0xDE] = cp_ar;
+    // instruction_cbprefix[0xDF] = cp_ar;
 
-    instruction_cbprefix[0xE0] = ret;
-    instruction_cbprefix[0xE1] = ret;
-    instruction_cbprefix[0xE2] = ret;
-    instruction_cbprefix[0xE3] = ret;
-    instruction_cbprefix[0xE4] = ret;
-    instruction_cbprefix[0xE5] = ret;
-    instruction_cbprefix[0xE6] = ret;
-    instruction_cbprefix[0xE7] = ret;
-    instruction_cbprefix[0xE8] = cp_ar;
-    instruction_cbprefix[0xE9] = cp_ar;
-    instruction_cbprefix[0xEA] = cp_ar;
-    instruction_cbprefix[0xEB] = cp_ar; // cb prefixed
-    instruction_cbprefix[0xEC] = cp_ar;
-    instruction_cbprefix[0xED] = cp_ar;
-    instruction_cbprefix[0xEE] = cp_ar;
-    instruction_cbprefix[0xEF] = cp_ar;
+    // instruction_cbprefix[0xE0] = ret;
+    // instruction_cbprefix[0xE1] = ret;
+    // instruction_cbprefix[0xE2] = ret;
+    // instruction_cbprefix[0xE3] = ret;
+    // instruction_cbprefix[0xE4] = ret;
+    // instruction_cbprefix[0xE5] = ret;
+    // instruction_cbprefix[0xE6] = ret;
+    // instruction_cbprefix[0xE7] = ret;
+    // instruction_cbprefix[0xE8] = cp_ar;
+    // instruction_cbprefix[0xE9] = cp_ar;
+    // instruction_cbprefix[0xEA] = cp_ar;
+    // instruction_cbprefix[0xEB] = cp_ar; // cb prefixed
+    // instruction_cbprefix[0xEC] = cp_ar;
+    // instruction_cbprefix[0xED] = cp_ar;
+    // instruction_cbprefix[0xEE] = cp_ar;
+    // instruction_cbprefix[0xEF] = cp_ar;
 
-    instruction_cbprefix[0xF0] = ret;
-    instruction_cbprefix[0xF1] = ret;
-    instruction_cbprefix[0xF2] = ret;
-    instruction_cbprefix[0xF3] = ret;
-    instruction_cbprefix[0xF4] = ret;
-    instruction_cbprefix[0xF5] = ret;
-    instruction_cbprefix[0xF6] = ret;
-    instruction_cbprefix[0xF7] = ret;
-    instruction_cbprefix[0xF8] = cp_ar;
-    instruction_cbprefix[0xF9] = cp_ar;
-    instruction_cbprefix[0xFA] = cp_ar;
-    instruction_cbprefix[0xFB] = cp_ar; // cb prefixed
-    instruction_cbprefix[0xFC] = cp_ar;
-    instruction_cbprefix[0xFD] = cp_ar;
-    instruction_cbprefix[0xFE] = cp_ar;
-    instruction_cbprefix[0xFF] = cp_ar;
+    // instruction_cbprefix[0xF0] = ret;
+    // instruction_cbprefix[0xF1] = ret;
+    // instruction_cbprefix[0xF2] = ret;
+    // instruction_cbprefix[0xF3] = ret;
+    // instruction_cbprefix[0xF4] = ret;
+    // instruction_cbprefix[0xF5] = ret;
+    // instruction_cbprefix[0xF6] = ret;
+    // instruction_cbprefix[0xF7] = ret;
+    // instruction_cbprefix[0xF8] = cp_ar;
+    // instruction_cbprefix[0xF9] = cp_ar;
+    // instruction_cbprefix[0xFA] = cp_ar;
+    // instruction_cbprefix[0xFB] = cp_ar; // cb prefixed
+    // instruction_cbprefix[0xFC] = cp_ar;
+    // instruction_cbprefix[0xFD] = cp_ar;
+    // instruction_cbprefix[0xFE] = cp_ar;
+    // instruction_cbprefix[0xFF] = cp_ar;
 }
-
-
 
 void Gameboy::step(){
     // update timer
@@ -603,14 +631,13 @@ void Gameboy::step(){
 
     // first instr for cartridges at 0x0100
     
-    uint8_t cycles;
+    uint8_t cycles = 0;
     
     // fetch instr PC
     opcode = readByte();
 
     // decode instr function table
-
-
+    execInstruction();
     // execute instr
 
 
@@ -620,6 +647,17 @@ void Gameboy::step(){
 
 uint8_t Gameboy::readByte(){
     return M[pc++];
+}
+
+void Gameboy::execInstruction(){
+    cout << hex << setfill('0') << setw(2) << (int) opcode << endl;
+    if(opcode == 0xCB){
+        opcode = readByte();
+        //(this->*instruction_cbprefix[opcode])();
+    } else{
+        //(this->*instruction_noprefix[opcode])();
+    }
+    cout << "exec: " << hex << setfill('0') << (int) opcode << endl;
 }
 
 // LOAD Instructions
