@@ -660,6 +660,43 @@ void Gameboy::execInstruction(){
     cout << "exec: " << hex << setfill('0') << (int) opcode << endl;
 }
 
+uint8_t rstAddress(uint8_t xxx){
+    switch(xxx){
+        case 0:
+            return 0x00;
+
+        case 1:
+            return 0x08;
+        case 2:
+            return 0x10;
+        case 3:
+            return 0x18;
+        case 4:
+            return 0x20;
+        case 5:
+            return 0x28;
+        case 6:
+            return 0x30;
+        case 7:
+            return 0x38;
+    }
+
+    return 0x00; // fixme handle err
+}
+
+bool Gameboy::checkCondition(uint8_t cc){
+    /*
+        0 NZ
+        1 Z
+        2 NC
+        3 C
+    */
+
+    bool z = checkZero(), c = checkCarry();
+
+    return (cc == 0 && !z) || (cc == 1 && z) || 
+        (cc == 2 && !c) || (cc == 3 && c);
+}
 
 bool Gameboy::checkZero(){
     return (R[F] >> 7u); // return bit 7
@@ -1612,5 +1649,138 @@ uint8_t Gameboy::ld_hlspdd(){
 // END CPU CONTROL instructions
 
 // JUMP instructions
+
+uint8_t Gameboy::jp_nn(){
+    uint8_t lsb = readByte();
+    uint8_t msb = readByte();
+
+    pc = (msb << 8u) | lsb;
+
+    return 16;
+}
+
+uint8_t Gameboy::jp_hl(){
+    pc = (R[H] << 8u) | R[L];
+
+    return 4;
+}
+
+uint8_t Gameboy::jp_fnn(){
+    uint8_t cc = (opcode >> 3u) & 0x3;
+
+    uint8_t lsb = readByte();
+    uint8_t msb = readByte();
+
+    if( checkCondition(cc) ){
+        pc = (msb << 8u) | lsb;
+
+        return 16;
+    }
+
+    return 12;   
+}
+
+uint8_t Gameboy::jr_pcdd(){
+    int8_t dd = readByte();
+
+    pc += dd;
+
+    return 12;
+}
+
+uint8_t Gameboy::jr_fpcdd(){
+    uint8_t cc = (opcode >> 3u) & 0x3;
+
+    int8_t dd = readByte();
+
+    if( checkCondition(cc) ){
+        pc += dd;
+
+        return 12;
+    }
+
+    return 8; 
+}
+
+uint8_t Gameboy::call_nn(){
+    uint8_t lsb = readByte();
+    uint8_t msb = readByte();
+
+    sp -= 1;
+    M[sp] = pc >> 8u;
+
+    sp -= 1;
+    M[sp] = pc;
+
+    pc = (msb << 8u) | lsb;
+
+    return 24;
+}
+
+uint8_t Gameboy::call_fnn(){
+    uint8_t cc = (opcode >> 3u) & 0x3;
+
+    uint8_t lsb = readByte();
+    uint8_t msb = readByte();
+
+    if( checkCondition(cc) ){
+        sp -= 1;
+        M[sp] = pc >> 8u;
+
+        sp -= 1;
+        M[sp] = pc;
+
+        pc = (msb << 8u) | lsb;
+
+        return 24;
+    }
+
+    return 12;
+}
+
+uint8_t Gameboy::ret(){
+    uint8_t lsb = M[sp];
+    sp += 1;
+
+    uint8_t msb = M[sp];
+    sp += 1;
+
+    pc = (msb << 8u) | lsb;
+
+    return 16;
+}
+
+uint8_t Gameboy::ret_f(){
+    uint8_t cc = (opcode >> 3u) & 0x3;
+
+    if( checkCondition(cc) ){
+        uint8_t lsb = M[sp];
+        sp += 1;
+
+        uint8_t msb = M[sp];
+        sp += 1;
+
+        pc = (msb << 8u) | lsb;
+
+        return 20;
+    }
+
+    return 8;
+}
+
+uint8_t Gameboy::reti(){
+    ret();
+    IME = 1;
+
+    return 16;
+}
+
+uint8_t Gameboy::rst_n(){
+    uint8_t n = rstAddress( (opcode >> 3u) & 0x7 );
+
+    pc = n;
+
+    return 16;
+}
 
 // END JUMP instructions

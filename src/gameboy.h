@@ -39,6 +39,7 @@ private:
 
     void execInstruction();
 
+    bool checkCondition(uint8_t);
     // flags bit 7, 6, 5, 4 of R[F]
     bool checkZero();
     bool checkCarry();
