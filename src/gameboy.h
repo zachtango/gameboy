@@ -27,7 +27,21 @@ private:
     uint16_t pc; // index value of current instruction in memory arr
     uint8_t opcode; // M[pc]
     uint64_t t_cycles; // fixme not sure if this is the right variable type
-    bool IME;
+
+    bool IME; // master flag for interrupts
+    /*
+        interrupt enable at 0xFFFF
+            when bits are set, corresponding interrupt can be triggered
+            0   Vblank (on/off)
+            1   LCD stat (on/off)
+            2   Timer (on/off)
+            3   Serial (on/off)
+            4   Joypad (on/off)
+        interrupt flags at 0xFF0F
+            when bits are set, an interrupt has happened
+            corresponding bits same as IE
+    */
+
 
     typedef uint8_t (Gameboy::*GameboyFunc)();
     unordered_map<uint8_t, GameboyFunc> instruction_noprefix; // opcode returns function pointer

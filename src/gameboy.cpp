@@ -633,15 +633,25 @@ void Gameboy::step(){
     
     uint8_t cycles = 0;
     
-    // fetch instr PC
+    // fetch instr
     opcode = readByte();
 
-    // decode instr function table
+    // decode and execute instr
     execInstruction();
-    // execute instr
-
 
     t_cycles += cycles;
+
+    // check for interrupts
+    /*
+        Interrupt           ISR address
+        vertical bank       0x0040
+        lcd status triggers 0x0048
+        timer overflow      0x0050
+        serial link         0x0058
+        joypad press        0x0060
+    */
+
+
 
 }
 
@@ -1629,7 +1639,7 @@ uint8_t Gameboy::ld_hlspdd(){
     uint16_t res = sp + dd;
 
     R[H] = res >> 8u;
-    R[L] = res;
+    R[L] = res; 
 
     return 12;
 }
@@ -1638,6 +1648,8 @@ uint8_t Gameboy::ld_hlspdd(){
 
 // ROTATE AND SHIFT instructions
 
+
+
 // END ROTATE AND SHIFT instructions
 
 // SINGLE BIT OPERATION instructions
@@ -1645,6 +1657,7 @@ uint8_t Gameboy::ld_hlspdd(){
 // END SINGLE BIT OPERATION instructions
 
 // CPU CONTROL instructions
+
 
 // END CPU CONTROL instructions
 
@@ -1769,8 +1782,9 @@ uint8_t Gameboy::ret_f(){
 }
 
 uint8_t Gameboy::reti(){
-    ret();
+    
     IME = 1;
+    ret();
 
     return 16;
 }
