@@ -65,6 +65,9 @@ private:
     void setH(bool);
     void setN(bool);
 
+    // null instr
+    void op_null();
+
     // LOAD instructions
 
     // 8 bit
