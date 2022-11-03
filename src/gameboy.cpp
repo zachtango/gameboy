@@ -660,6 +660,83 @@ void Gameboy::execInstruction(){
     cout << "exec: " << hex << setfill('0') << (int) opcode << endl;
 }
 
+
+bool Gameboy::checkZero(){
+    return (R[F] >> 7u); // return bit 7
+}
+
+bool Gameboy::checkN(){
+    return (R[F] >> 6u) & 0x1; // return bit 6
+}
+
+bool Gameboy::checkH(){
+    return (R[F] >> 5u) & 0x1; // return bit 5
+}
+
+bool Gameboy::checkCarry(){
+    return (R[F] >> 4u) & 0x1; // return bit 4
+}
+
+void Gameboy::setZero(bool z){
+
+    if(z){
+        R[F] |= 0x80;
+    } else{
+        R[F] &= 0x7F;
+    }
+
+}
+
+void Gameboy::setN(bool n){
+    if(n){
+        R[F] |= 0x40;
+    } else{
+        R[F] &= 0xBF;
+    }
+}
+
+void Gameboy::setH(bool h){
+    if(h){
+        R[F] |= 0x20;
+    } else{
+        R[F] &= 0xDF;
+    }
+}
+
+void Gameboy::setCarry(bool c){
+    
+    if(c){
+        R[F] |= 0x10;
+    } else{
+        R[F] &= 0xEF;
+    }
+
+}
+
+bool checkHAdd(int16_t a, int16_t b, bool c){
+    return ( (a & 0x0F) + (b & 0x0F + c) ) > 0x0F;
+}
+
+bool checkHSub(int16_t a, int16_t b, bool c){
+    return (a & 0x0F) < (b & 0x0F + c);
+}
+
+bool checkC8Add(int8_t a, int8_t b, bool c){
+    return ( a > 0 && (b + c) > (INT8_MAX - a) ) ;
+}
+
+bool checkC8Sub(int8_t a, int8_t b, bool c){
+    return a < (b + c);
+}
+
+bool checkC16Add(int16_t a, int16_t b, bool c){
+    return ( a > 0 && (b + c) > (INT16_MAX - a) );
+}
+
+bool checkC16Sub(int16_t a, int16_t b, bool c){
+    return a < (b + c);
+}
+
 // LOAD Instructions
 
 // 8 bit load instructions
@@ -938,8 +1015,23 @@ uint8_t Gameboy::pop_rr(){
     uint8_t msb = M[sp];
     sp += 1;
 
-    R[B] = msb;
-    R[C] = lsb;
+    switch(rr){
+        case 0:
+            R[B] = msb;
+            R[C] = lsb;
+            break;
+        case 1:
+            R[D] = msb;
+            R[E] = lsb;
+            break;
+        case 2:
+            R[H] = msb;
+            R[L] = lsb;
+            break;
+        case 3:
+            R[A] = msb;
+            R[F] = lsb;
+    }
 
     return 12;
 }
@@ -953,7 +1045,13 @@ uint8_t Gameboy::add_ar(){
 
     uint8_t r = opcode & 0x0F;
 
+    setN(0);
+    setH( checkHAdd(R[A], R[r], 0) );
+    setCarry( checkC8Add(R[A], R[r], 0) );
+
     R[A] += R[r];
+
+    setZero(R[A] == 0);
 
     return 4;
 }
@@ -962,7 +1060,13 @@ uint8_t Gameboy::add_an(){
     
     uint8_t n = readByte();
 
+    setN(0);
+    setH( checkHAdd(R[A], n, 0) );
+    setCarry( checkC8Add(R[A], n, 0) );
+
     R[A] += n;
+
+    setZero(R[A] == 0);
 
     return 8;
 }
@@ -971,7 +1075,13 @@ uint8_t Gameboy::add_ahl(){
 
     uint16_t hl = (R[H] << 8u) | R[L];
 
+    setN(0);
+    setH( checkHAdd(R[A], M[hl], 0) );
+    setCarry( checkC8Add(R[A], M[hl], 0) );
+
     R[A] += M[hl];
+
+    setZero(R[A] == 0);
 
     return 8;
 }
@@ -979,8 +1089,15 @@ uint8_t Gameboy::add_ahl(){
 uint8_t Gameboy::adc_ar(){
 
     uint8_t r = opcode & 0x0F;
+    bool c = checkCarry();
 
-    R[A] += R[r]; // + cy carry flag
+    setN(0);
+    setH( checkHAdd(R[A], R[r], c) );
+    setCarry( checkC8Add(R[A], R[r], c) );
+
+    R[A] += R[r] + c;
+
+    setZero(R[A] == 0);
 
     return 4;
 }
@@ -989,7 +1106,15 @@ uint8_t Gameboy::adc_an(){
 
     uint8_t n = readByte();
 
-    R[A] += n; // + cy carry flag
+    bool c = checkCarry();
+
+    setN(0);
+    setH( checkHAdd(R[A], n, c) );
+    setCarry( checkC8Add(R[A], n, c) );
+
+    R[A] += n + c;
+
+    setZero(R[A] == 0);
 
     return 8;
 }
@@ -998,16 +1123,31 @@ uint8_t Gameboy::adc_ahl(){
 
     uint16_t hl = (R[H] << 8u) | R[L];
 
-    R[A] += M[hl]; // + cy carry flag
+    bool c = checkCarry();
+
+    setN(0);
+    setH( checkHAdd(R[A], M[hl], c) );
+    setCarry( checkC8Add(R[A], M[hl], c) );
+
+    R[A] += M[hl] + c;
+
+    setZero(R[A] == 0);
 
     return 8;
 }
 
 uint8_t Gameboy::sub_ar(){
+    // a - b = a + -b
 
     uint8_t r = opcode & 0x0F;
+    
+    setN(1);
+    setH( checkHSub(R[A], R[r], 0) );
+    setCarry( checkC8Sub(R[A], R[r], 0) );
 
     R[A] -= r;
+
+    setZero(R[A] == 0);
 
     return 4;
 }
@@ -1016,7 +1156,13 @@ uint8_t Gameboy::sub_an(){
     
     uint8_t n = readByte();
 
+    setN(1);
+    setH( checkHSub(R[A], n, 0) );
+    setCarry( checkC8Sub(R[A], n, 0) );
+
     R[A] -= n;
+
+    setZero(R[A] == 0);
 
     return 8;
 }
@@ -1025,7 +1171,13 @@ uint8_t Gameboy::sub_ahl(){
 
     uint16_t hl = (R[H] << 8u) | R[L];
 
+    setN(0);
+    setH( checkHSub(R[A], M[hl], 0) );
+    setCarry( checkC8Sub(R[A], M[hl], 0) );
+
     R[A] -= M[hl];
+
+    setZero(R[A] == 0);
 
     return 8;
 }
@@ -1034,7 +1186,15 @@ uint8_t Gameboy::sbc_ar(){
 
     uint8_t r = opcode & 0x0F;
 
-    R[A] -= (R[r]); // + cy flag
+    bool c = checkCarry();
+
+    setN(1);
+    setH( checkHSub(R[A], R[r], c) );
+    setCarry( checkC8Sub(R[A], R[r], c) );
+
+    R[A] -= (R[r] + c);
+
+    setZero(R[A] == 0);
 
     return 4;
 }
@@ -1043,7 +1203,15 @@ uint8_t Gameboy::sbc_an(){
 
     uint8_t n = readByte();
 
-    R[A] -= n; // + cy flag
+    bool c = checkCarry();
+
+    setN(1);
+    setH( checkHSub(R[A], n, c) );
+    setCarry( checkC8Sub(R[A], n, c) );
+
+    R[A] -= (n + c);
+
+    setZero(R[A] == 0);
 
     return 8;
 }
@@ -1052,7 +1220,15 @@ uint8_t Gameboy::sbc_ahl(){
 
     uint16_t hl = (R[H] << 8u) | R[L];
 
-    R[A] -= M[hl]; // + cy flag
+    bool c = checkCarry();
+
+    setN(1);
+    setH( checkHSub(R[A], M[hl], c) );
+    setCarry( checkC8Sub(R[A], M[hl], c) );
+
+    R[A] -= (M[hl] + c);
+
+    setZero(R[A] == 0);
 
     return 8;
 }
@@ -1063,6 +1239,11 @@ uint8_t Gameboy::and_ar(){
 
     R[A] &= R[r];
 
+    setZero(R[A] == 0);
+    setN(0);
+    setH(1);
+    setCarry(0);
+
     return 4;
 }
 
@@ -1071,6 +1252,11 @@ uint8_t Gameboy::and_an(){
     uint8_t n = readByte();
 
     R[A] &= n;
+
+    setZero(R[A] == 0);
+    setN(0);
+    setH(1);
+    setCarry(0);
 
     return 8;
 }
@@ -1081,6 +1267,11 @@ uint8_t Gameboy::and_ahl(){
 
     R[A] &= M[hl];
 
+    setZero(R[A] == 0);
+    setN(0);
+    setH(1);
+    setCarry(0);
+
     return 8;
 }
 
@@ -1089,6 +1280,11 @@ uint8_t Gameboy::xor_ar(){
     uint8_t r = opcode & 0x0F;
 
     R[A] ^= R[r];
+
+    setZero(R[A] == 0);
+    setN(0);
+    setH(0);
+    setCarry(0);
 
     return 4;
 }
@@ -1099,6 +1295,11 @@ uint8_t Gameboy::xor_an(){
 
     R[A] ^= n;
 
+    setZero(R[A] == 0);
+    setN(0);
+    setH(0);
+    setCarry(0);
+
     return 8;
 }
 
@@ -1107,6 +1308,11 @@ uint8_t Gameboy::xor_ahl(){
     uint16_t hl = (R[H] << 8u) | R[L];
 
     R[A] ^= M[hl];
+
+    setZero(R[A] == 0);
+    setN(0);
+    setH(0);
+    setCarry(0);
 
     return 8;
 }
@@ -1117,6 +1323,11 @@ uint8_t Gameboy::or_ar(){
 
     R[A] |= R[r];
 
+    setZero(R[A] == 0);
+    setN(0);
+    setH(0);
+    setCarry(0);
+
     return 4;
 }
 
@@ -1125,6 +1336,11 @@ uint8_t Gameboy::or_an(){
     uint8_t n = readByte();
 
     R[A] |= n;
+
+    setZero(R[A] == 0);
+    setN(0);
+    setH(0);
+    setCarry(0);
 
     return 8;
 }
@@ -1135,23 +1351,22 @@ uint8_t Gameboy::or_ahl(){
 
     R[A] |= M[hl];
 
+    setZero(R[A] == 0);
+    setN(0);
+    setH(0);
+    setCarry(0);
+
     return 8;
 }
-
-// uint8_t Gameboy::or_ahl(){
-
-//     uint16_t hl = (R[H] << 8u) | R[L];
-
-//     R[A] |= hl;
-
-//     return 8;
-// }
 
 uint8_t Gameboy::cp_ar(){
 
     uint8_t r = opcode & 0x0F;
 
-    // compare a - r change flags
+    setN(1);
+    setH( checkHSub(R[A], R[r], 0) );
+    setCarry( checkC8Sub(R[A], R[r], 0) );
+    setZero(R[A] - R[r] == 0);
 
     return 4;
 }
@@ -1160,7 +1375,10 @@ uint8_t Gameboy::cp_an(){
 
     uint8_t n = readByte();
 
-    // compare a - n change flags
+    setN(1);
+    setH( checkHSub(R[A], n, 0) );
+    setCarry( checkC8Sub(R[A], n, 0) );
+    setZero(R[A] - n == 0);
 
     return 8;
 }
@@ -1169,7 +1387,10 @@ uint8_t Gameboy::cp_ahl(){
 
     uint16_t hl = (R[H] << 8u) | R[L];
 
-    // compare a - hl
+    setN(1);
+    setH( checkHSub(R[A], M[hl], 0) );
+    setCarry( checkC8Sub(R[A], M[hl], 0) );
+    setZero(R[A] - M[hl] == 0);
 
     return 8;
 }
@@ -1178,7 +1399,12 @@ uint8_t Gameboy::inc_r(){
 
     uint8_t r = opcode >> 3u;
 
+    setN(0);
+    setH( checkHAdd(R[r], 1, 0) );
+
     R[r] += 1;
+
+    setZero(R[r] == 0);
 
     return 4;
 }
@@ -1187,7 +1413,12 @@ uint8_t Gameboy::inc_hl(){
 
     uint16_t hl = (R[H] << 8u) | R[L];
 
+    setN(0);
+    setH( checkC8Add(M[hl], 1, 0) );
+
     M[hl] += 1;
+
+    setZero(M[hl] == 0);
 
     return 12;
 }
@@ -1196,7 +1427,12 @@ uint8_t Gameboy::dec_r(){
 
     uint8_t r = opcode >> 3u;
 
+    setN(1);
+    setH( checkHSub(R[r], 1, 0) );
+
     R[r] -= 1;
+
+    setZero(R[r] == 0);
 
     return 4;
 }
@@ -1205,20 +1441,28 @@ uint8_t Gameboy::dec_hl(){
 
     uint16_t hl = (R[H] << 8u) | R[L];
 
+    setN(1);
+    setH( checkHSub(M[hl], 1, 0) );
+
     M[hl] -= 1;
+
+    setZero(M[hl] == 0);
 
     return 12;
 }
 
 uint8_t Gameboy::daa(){
 
-
+    // decimal adjust a
     return 4;
 }
 
 uint8_t Gameboy::cpl(){
 
     R[A] ^= 0xFF; // complement A
+
+    setN(1);
+    setH(1);
 
     return 4;
 }
@@ -1242,6 +1486,10 @@ uint8_t Gameboy::add_hlrr(){
 
     uint16_t hl = (R[H] << 8u) | R[L];
 
+    setN(0);
+    setH( checkHAdd(hl, rr, 0) );
+    setCarry( checkC16Add(hl, rr, 0) );
+
     hl += rr;
 
     R[H] = hl >> 8u;
@@ -1251,68 +1499,87 @@ uint8_t Gameboy::add_hlrr(){
 }
 
 uint8_t Gameboy::inc_rr(){
+    if(opcode >> 4u == 3){
+        sp += 1;
+        return 8;
+    }
 
     // rr may be BC = 0 DE = 1 HL = 2 SP = 3
-    uint16_t rr;
+    uint8_t r1, r2;
 
     switch(opcode >> 4u){
         case 0:
-            rr = (R[B] << 8u) | R[C];
-            rr += 1;
-
-            R[B] = rr >> 8u;
-            R[C] = (uint8_t) rr;
+            r1 = B, r2 = C;
+            break;
         case 1:
-            rr = (R[D] << 8u) | R[E];
-            rr += 1;
-
-            R[D] = rr >> 8u;
-            R[E] = (uint8_t) rr;
+            r1 = D, r2 = E;
+            break;
         case 2:
-            rr = (R[H] << 8u) | R[L];
-            rr += 1;
-
-            R[H] = rr >> 8u;
-            R[L] = (uint8_t) rr;
-        case 3:
-            sp += 1;
+            r1 = H, r2 = L;
     }
+
+    uint16_t rr = (R[r1] << 8u) | R[r2];
+    rr += 1;
+
+    R[r1] = rr >> 8u;
+    R[r2] = (uint8_t) rr;
 
     return 8;
 }
 
 uint8_t Gameboy::dec_rr(){
+    if(opcode >> 4u == 3){
+        sp -= 1;
+        return 8;
+    }
 
     // rr may be BC = 0 DE = 1 HL = 2 SP = 3
-    uint16_t rr;
+    uint8_t r1, r2;
 
     switch(opcode >> 4u){
         case 0:
-            rr = (R[B] << 8u) | R[C];
-            rr -= 1;
-
-            R[B] = rr >> 8u;
-            R[C] = (uint8_t) rr;
+            r1 = B, r2 = C;
+            break;
         case 1:
-            rr = (R[D] << 8u) | R[E];
-            rr -= 1;
-
-            R[D] = rr >> 8u;
-            R[E] = (uint8_t) rr;
+            r1 = D, r2 = E;
+            break;
         case 2:
-            rr = (R[H] << 8u) | R[L];
-            rr -= 1;
-
-            R[H] = rr >> 8u;
-            R[L] = (uint8_t) rr;
-        case 3:
-            sp -= 1;
+            r1 = H, r2 = L;
     }
+
+    uint16_t rr = (R[r1] << 8u) | R[r2];
+    rr -= 1;
+
+    R[r1] = rr >> 8u;
+    R[r2] = (uint8_t) rr;
 
     return 8;
 }
 
+uint8_t Gameboy::add_spdd(){
+    setZero(0);
+    setN(0);
 
+    int8_t dd = readByte();
+
+    if(dd < 0){ // subtraction
+        setH( checkHSub(sp, (~dd + 1), 0) );
+        setCarry( checkC16Sub(sp, (~dd + 1), 0) );
+    } else{ // addition
+        setH( checkHAdd(sp, dd, 0) );
+        setCarry( checkC16Add(sp, dd, 0) );
+    }
+
+    sp += dd;
+
+    return 16;
+}
+
+uint8_t Gameboy::ld_hlspdd(){
+    
+
+    return 12;
+}
 
 // END ARITHMETIC instructions
 

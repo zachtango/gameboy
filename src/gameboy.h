@@ -26,7 +26,7 @@ private:
     uint8_t sp; // points to top of stack in memory
     uint16_t pc; // index value of current instruction in memory arr
     uint8_t opcode; // M[pc]
-    uint64_t t_cycles; // fixme not sure if this is the right variable
+    uint64_t t_cycles; // fixme not sure if this is the right variable type
     bool IME;
 
     typedef uint8_t (Gameboy::*GameboyFunc)();
@@ -38,6 +38,17 @@ private:
     uint8_t readByte();
 
     void execInstruction();
+
+    // flags bit 7, 6, 5, 4 of R[F]
+    bool checkZero();
+    bool checkCarry();
+    bool checkH();
+    bool checkN();
+
+    void setZero(bool);
+    void setCarry(bool);
+    void setH(bool);
+    void setN(bool);
 
     // LOAD instructions
 
