@@ -149,10 +149,19 @@ private:
     // END ARITHMETIC instructions
 
     // ROTATE SHIFT instructions
-    uint8_t rlca();
-    uint8_t rla();
-    uint8_t rrca();
-    uint8_t rra();
+    void rlc(uint8_t*);
+    void rl(uint8_t*);
+    void rrc(uint8_t*);
+    void rr(uint8_t*);
+    void sla(uint8_t*);
+    void swap(uint8_t*);
+    void sra(uint8_t*);
+    void srl(uint8_t*);
+
+    uint8_t rlc_a();
+    uint8_t rl_a();
+    uint8_t rrc_a();
+    uint8_t rr_a();
     uint8_t rlc_r();
     uint8_t rlc_hl();
     uint8_t rl_r();

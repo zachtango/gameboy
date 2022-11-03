@@ -12,7 +12,7 @@ int main(){
     //     gb.step();
     // }
 
-    int n = 58;
+    int n = (true << 7u);
     bitset<8> x(n);
     bitset<8> y(-n);
 

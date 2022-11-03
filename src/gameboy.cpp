@@ -1647,8 +1647,274 @@ uint8_t Gameboy::ld_hlspdd(){
 // END ARITHMETIC instructions
 
 // ROTATE AND SHIFT instructions
+void Gameboy::rlc(uint8_t *reg){
+    setN(0);
+    setH(0);
 
+    setCarry( *reg >> 7u ); // bit 7
 
+    *reg <<= 1u; // shift left 1
+    *reg |= checkCarry(); // set bit 0 to carry flag
+
+    setZero(*reg == 0);
+}
+
+void Gameboy::rl(uint8_t *reg){
+    setN(0);
+    setH(0);
+
+    bool c = checkCarry();
+    setCarry( *reg >> 7u );
+
+    *reg << 1u;
+    *reg |= c; // set bit 0 to prev carry flag
+
+    setZero(*reg == 0);
+}
+
+void Gameboy::rrc(uint8_t *reg){
+    setN(0);
+    setH(0);
+
+    setCarry( *reg & 0x1 );
+
+    *reg >>= 1u;
+    *reg |= (checkCarry() << 7u);
+
+    setZero(*reg == 0);
+}
+
+void Gameboy::rr(uint8_t *reg){
+    setN(0);
+    setH(0);
+
+    bool c = checkCarry();
+    setCarry( *reg & 0x1 );
+
+    *reg >>= 1u;
+    *reg |= (c << 7u);
+
+    setZero(*reg == 0);
+}
+
+void Gameboy::sla(uint8_t *reg){
+    setN(0);
+    setH(0);
+    setCarry(*reg >> 7u);
+
+    *reg <<= 1u;
+
+    setZero(*reg == 0);
+}
+
+void Gameboy::swap(uint8_t *reg){
+    setN(0);
+    setH(0);
+    setCarry(0);
+
+    uint8_t lsn = *reg & 0b00001111;
+    uint8_t msn = (*reg & 0b11110000) >> 4u;
+
+    *reg = (lsn << 4u) | msn;
+
+    setZero(*reg == 0);
+}
+
+void Gameboy::sra(uint8_t *reg){
+    setN(0);
+    setH(0);
+    setCarry(*reg & 0x1);
+
+    bool b7 = *reg & 0b10000000;
+
+    *reg >>= 1u;
+    *reg |= (b7 << 7u);
+
+    setZero(*reg == 0);
+}
+
+void Gameboy::srl(uint8_t *reg){
+    setN(0);
+    setH(0);
+
+    setCarry(*reg & 0x1);
+
+    *reg >>= 1u;
+
+    setZero(*reg == 0);
+}
+
+uint8_t Gameboy::rlc_a(){
+    rlc( &R[A] );
+    setZero(0);
+
+    return 4;
+}
+
+uint8_t Gameboy::rl_a(){
+    rl( &R[A] );
+    setZero(0);
+
+    return 4;
+}
+
+uint8_t Gameboy::rrc_a(){
+    rrc( &R[A] );
+    setZero(0);
+
+    return 4;
+}
+
+uint8_t Gameboy::rr_a(){
+    rr( &R[A] );
+    setZero(0);
+
+    return 4;
+}
+
+uint8_t Gameboy::rlc_r(){
+    uint8_t r = readByte();
+
+    rlc( &R[r] );
+
+    return 8;
+}
+
+uint8_t Gameboy::rlc_hl(){
+    readByte();
+
+    uint16_t hl = (R[H] << 8u) | R[L];
+
+    rlc( &M[hl] );
+
+    return 16;
+}
+
+uint8_t Gameboy::rl_r(){
+    uint8_t r = readByte() & 0x0F;
+
+    rl( &R[r] );
+
+    return 8;
+}
+
+uint8_t Gameboy::rl_hl(){
+    readByte();
+
+    uint16_t hl = (R[H] << 8u) | R[L];
+
+    rl( &M[hl] );
+
+    return 16;
+}
+
+uint8_t Gameboy::rrc_r(){
+    uint8_t r = readByte() & 0x0F;
+
+    rrc( &R[r] );
+
+    return 8;
+}
+
+uint8_t Gameboy::rrc_hl(){
+    readByte();
+
+    uint16_t hl = (R[H] << 8u) | R[L];
+
+    rrc( &M[hl] );
+
+    return 16;
+}
+
+uint8_t Gameboy::rr_r(){
+    uint8_t r = readByte() & 0x0F;
+
+    rr( &R[r] );
+
+    return 8;
+}
+
+uint8_t Gameboy::rr_hl(){
+    readByte();
+
+    uint16_t hl = (R[H] << 8u) | R[L];
+
+    rr( &M[hl] );
+
+    return 16;
+}
+
+uint8_t Gameboy::sla_r(){
+    uint8_t r = readByte() & 0x0F;
+
+    sla( &R[r] );
+
+    return 8;
+}
+
+uint8_t Gameboy::sla_hl(){
+    readByte();
+
+    uint16_t hl = (R[H] << 8u) | R[L];
+
+    sla( &M[hl] );
+
+    return 16;
+}
+
+uint8_t Gameboy::swap_r(){
+    uint8_t r = readByte() & 0x0F;
+
+    swap( &R[r] );
+
+    return 8;
+}
+
+uint8_t Gameboy::swap_hl(){
+    readByte();
+
+    uint16_t hl = (R[H] << 8u) | R[L];
+
+    swap( &M[hl] );
+
+    return 16;
+}
+
+uint8_t Gameboy::sra_r(){
+    uint8_t r = readByte() & 0x0F;
+
+    sra( &R[r] );
+
+    return 8;
+}
+
+uint8_t Gameboy::sra_hl(){
+    readByte();
+
+    uint16_t hl = (R[H] << 8u) | R[L];
+
+    sra( &M[hl] );
+
+    return 16;
+}
+
+uint8_t Gameboy::srl_r(){
+    uint8_t r = readByte() & 0x0F;
+
+    srl( &R[r] );
+
+    return 8;
+}
+
+uint8_t Gameboy::srl_hl(){
+    readByte();
+
+    uint16_t hl = (R[H] << 8u) | R[L];
+
+    srl( &M[hl] );
+
+    return 16;
+}
 
 // END ROTATE AND SHIFT instructions
 
