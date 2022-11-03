@@ -1576,13 +1576,41 @@ uint8_t Gameboy::add_spdd(){
 }
 
 uint8_t Gameboy::ld_hlspdd(){
-    
+    setZero(0);
+    setN(0);
+
+    int8_t dd = readByte();
+
+    if(dd < 0){ // subtraction
+        setH( checkHSub(sp, (~dd + 1), 0) );
+        setCarry( checkC16Sub(sp, (~dd + 1), 0) );
+    } else{ // addition
+        setH( checkHAdd(sp, dd, 0) );
+        setCarry( checkC16Add(sp, dd, 0) );
+    }
+
+    uint16_t res = sp + dd;
+
+    R[H] = res >> 8u;
+    R[L] = res;
 
     return 12;
 }
 
 // END ARITHMETIC instructions
 
-// CONTROL FLOW instructions
+// ROTATE AND SHIFT instructions
 
-// END CONTROL FLOW instructions
+// END ROTATE AND SHIFT instructions
+
+// SINGLE BIT OPERATION instructions
+
+// END SINGLE BIT OPERATION instructions
+
+// CPU CONTROL instructions
+
+// END CPU CONTROL instructions
+
+// JUMP instructions
+
+// END JUMP instructions
