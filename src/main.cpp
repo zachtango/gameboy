@@ -1,22 +1,31 @@
 #include "gameboy.h"
+#include "ppu.h"
 #include <iostream>
+#include <SDL2/SDL.h>
 #include <bitset>
 
 using namespace std;
 
-int main(){
+const int SCREEN_WIDTH = 640;
+const int SCREEN_HEIGHT = 480;
 
-    // Gameboy gb = Gameboy();
 
-    // for(int i = 0; i < 256; i++){
-    //     gb.step();
-    // }
+int main(int argv, char** args){
 
-    int n = (true << 7u);
-    bitset<8> x(n);
-    bitset<8> y(-n);
 
-    cout << x << ' ' << y << endl;
+    Gameboy gb = Gameboy();
+    PPU platform = PPU();
+
+    
+
+    for(int i = 0; i < 0x10000; i++){
+        gb.step();
+        // platform.updateWindow(gb.backgroundTileMap);
+    }
+    
+    gb.printVRAM();
+
+    platform.updateWindow(gb.backgroundTileMap, gb.windowTileMap);
 
     return 0;
 }

@@ -4,12 +4,17 @@
 
 using namespace std;
 
+#define BACKGROUND_TILE_SIZE 1024
+#define BACKGROUND_TILEMAP0_ADDRESS 0x9800
+#define BACKGROUND_TILEMAP1_ADDRESS 0x9C00
+#define BACKGROUND_TILEDATA0_ADDRESS 0x8800
+#define BACKGROUND_TILEDATA1_ADDRESS 0x8000
 #define MEMORY_SIZE 0x10000
 #define REGISTERS_SIZE 8
 #define TIMA 0xFF05 // timer address
 #define TMA 0xFF06 // timer modulo
 #define TAC 0xFF07 // time control
-
+#define LCD 0xFF40 // LCD control
 
 enum Register { B, C, D, E, H, L, F, A };
 
@@ -18,9 +23,12 @@ class Gameboy{
 public:
     Gameboy();
     void step(); // fetch-decode-execute
+    uint8_t *backgroundTileMap[BACKGROUND_TILE_SIZE]; // tile size is 16 bytes, this points to first byte of tile
+    uint8_t *windowTileMap[BACKGROUND_TILE_SIZE];
+    void printVRAM();
 
 private:
-    
+
     uint8_t M[MEMORY_SIZE];
     uint8_t R[REGISTERS_SIZE];
     uint8_t sp; // points to top of stack in memory
@@ -47,11 +55,16 @@ private:
     unordered_map<uint8_t, GameboyFunc> instruction_noprefix; // opcode returns function pointer
     unordered_map<uint8_t, GameboyFunc> instruction_cbprefix;
 
+
+    void mapBackgroundTiles();
+    void mapWindowTiles();
+
     void loadROM(string);
 
     uint8_t readByte();
 
     void execInstruction();
+    void mapInstructions();
 
     bool checkCondition(uint8_t);
     // flags bit 7, 6, 5, 4 of R[F]
@@ -64,6 +77,8 @@ private:
     void setCarry(bool);
     void setH(bool);
     void setN(bool);
+
+    void handleInterrupt();
 
     // null instr
     void op_null();

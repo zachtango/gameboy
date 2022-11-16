@@ -4,7 +4,7 @@
 #include <iomanip>
 
 Gameboy::Gameboy(){
-    pc = 0;
+    pc = 0x100;
     t_cycles = 0;
 
     // https://gbdev.io/pandocs/Memory_Map.html
@@ -16,7 +16,7 @@ Gameboy::Gameboy(){
     // https://gbdev.gg8.se/files/roms/bootroms/
     // boot rom
     ifstream file;
-    file.open("roms/dmg_boot.bin", ios::binary | ios::ate);
+    file.open("roms/dmg-acid2.gb", ios::binary | ios::ate);
     
     if( file.is_open() ){
         streampos size = file.tellg();
@@ -32,13 +32,17 @@ Gameboy::Gameboy(){
         }
 
         delete [] buffer;
-    }
+    } 
 
     // 0x4000 - 0x7FFF ROM cartridge, switchable bank
     // 0x8000 - 0x9FFFF video RAM
     // 0xA000 - 0xBFFFF external RAM
     
 
+    mapInstructions();
+}
+
+void Gameboy::mapInstructions(){
     // https://izik1.github.io/gbops/index.html
     // no prefix
     instruction_noprefix[0x00] = nop;
@@ -622,6 +626,45 @@ Gameboy::Gameboy(){
     instruction_cbprefix[0xFF] = set_nr;
 }
 
+void Gameboy::printVRAM(){
+    for(int i = 0x8000; i < 0x9800; i++){
+        cout << hex << setw(2) << setfill('0') << (int) M[i] << endl;
+    }
+}
+
+void Gameboy::mapBackgroundTiles(){
+    // BG tile map area	0=9800-9BFF, 1=9C00-9FFF
+    // default 9800 - 9BFF in memory
+    
+    uint16_t tileMapAddress = BACKGROUND_TILEMAP0_ADDRESS;
+    uint16_t tileDataAddress = BACKGROUND_TILEDATA0_ADDRESS;
+
+    if( (M[LCD] >> 3u) & 0x1 ){
+        tileMapAddress = BACKGROUND_TILEMAP1_ADDRESS;
+        tileDataAddress = BACKGROUND_TILEDATA1_ADDRESS;
+    }
+
+    for(uint16_t i = 0; i < 1024; i++){
+        backgroundTileMap[i] = &M[tileDataAddress + 16 * M[tileMapAddress + i]];
+    }
+}
+
+void Gameboy::mapWindowTiles(){
+    // Window tile map area	0=9800-9BFF, 1=9C00-9FFF
+    
+    uint16_t tileMapAddress = BACKGROUND_TILEMAP0_ADDRESS;
+    uint16_t tileDataAddress = BACKGROUND_TILEDATA0_ADDRESS;
+
+    if( (M[LCD] >> 3u) & 0x1 ){
+        tileMapAddress = BACKGROUND_TILEMAP1_ADDRESS;
+        tileDataAddress = BACKGROUND_TILEDATA1_ADDRESS;
+    }
+
+    for(uint16_t i = 0; i < 1024; i++){
+        windowTileMap[i] = &M[tileDataAddress + 16 * M[tileMapAddress + i]];
+    }
+}
+
 void Gameboy::step(){
     // update timer
     // instr
@@ -637,9 +680,9 @@ void Gameboy::step(){
 
     // decode and execute instr
     execInstruction();
-
-    t_cycles += cycles;
-
+    mapBackgroundTiles();
+    mapWindowTiles();
+    
     // check for interrupts
     /*
         Interrupt           ISR address
@@ -649,9 +692,47 @@ void Gameboy::step(){
         serial link         0x0058
         joypad press        0x0060
     */
+   if(IME && M[0xFFFF] && M[0xFF0F]) handleInterrupt();
 
+    t_cycles += cycles;
+}
 
+void Gameboy::handleInterrupt(){
+    uint8_t IE = M[0xFFFF];
+    uint8_t IF = M[0xFF0F];
 
+    bool vblank = (IE && IF && 0x1),
+        lcdStat = ( ( (IE && IF) >> 1u ) && 0x1 ),
+        timer = ( ( (IE && IF) >> 2u ) && 0x1 ),
+        serial = ( ( (IE && IF) >> 3u ) && 0x1 ),
+        joypad = ( ( (IE && IF) >> 4u ) && 0x1 );
+
+    if(vblank || lcdStat || timer || serial || joypad){
+        // call
+        sp -= 1;
+        M[sp] = pc >> 8u;
+
+        sp -= 1;
+        M[sp] = pc;
+
+        // check in order of prio bit 0 - 4
+        if(vblank){
+            pc = 0x40;
+        } else if(lcdStat){
+            pc = 0x48;
+        } else if(timer){
+            pc = 0x50;
+        } else if(serial){
+            pc = 0x58;
+        } else if(joypad){
+            pc = 0x60;
+        }
+
+        // 5 m cycles --> 20 t cycles
+        
+    }
+    
+    // 0 m cycles
 }
 
 uint8_t Gameboy::readByte(){
@@ -662,12 +743,15 @@ void Gameboy::execInstruction(){
     cout << hex << setfill('0') << setw(2) << (int) opcode << endl;
     if(opcode == 0xCB){
         opcode = readByte();
-        //(this->*instruction_cbprefix[opcode])();
+        (this->*instruction_cbprefix[opcode])();
     } else{
-        //(this->*instruction_noprefix[opcode])();
+        (this->*instruction_noprefix[opcode])();
     }
     cout << "exec: " << hex << setfill('0') << (int) opcode << endl;
 }
+
+
+
 bool Gameboy::checkCondition(uint8_t cc){
     /*
         0 NZ
@@ -1977,13 +2061,15 @@ uint8_t Gameboy::nop(){
     return 4;
 }
 
-// uint8_t Gameboy::halt(){
+uint8_t Gameboy::halt(){
     
-// }
+    return 0;
+}
 
-// uint8_t Gameboy::stop(){
+uint8_t Gameboy::stop(){
 
-// }
+    return 0;
+}
 
 uint8_t Gameboy::di(){
     IME = 0;
