@@ -1,6 +1,14 @@
+#include "mmu.h"
 #include <stdint.h>
+#include <string>
 
+typedef struct instruction instruction;
+typedef struct registers registers;
 
+// referencing SM83_decoding-1.pdf in repo
+#define r8Dest (opcode >> 3u) & 0b111
+#define r8Source (opcode) && 0b111
+#define r16 (opcode >> 4u) && 0b11
 
 class CPU {
 
@@ -41,14 +49,15 @@ private:
 
     typedef void(CPU::*fp)();
     struct instruction {
-        char *name;
+        const char *name;
         uint8_t operandLen;
         fp exec;
-        uint8_t t_cycles;
+        // uint8_t t_cycles;
+        int t_cycles;
     };
 
-    struct registers regs;
-    struct instruction instructions[256] = {
+    registers regs;
+    instruction instructions[256] = {
         {"NOP ----", 0, nop, 4}, // 0x00 opcode
         {"LD BC, u16 ----", 2, ld_rr_nn, 12}, // 0x01 opcode ...
         {"LD (BC), A ----", 0, ld_bc_a, 8},
@@ -322,14 +331,22 @@ private:
         {"RST 38h ----", 0, rst, 16},
     };
 
+    uint8_t opcode;
+
 public:
     CPU();
 
     void step();
 
-    uint8_t readPC();
+    uint8_t readByte(); // reads byte from M[pc] and incr pc by 1
+    uint16_t readWord(); // reads word from M[pc] and incr pc by 2
 
-    void exec(uint8_t);
+    uint8_t readR(uint8_t r);
+    uint16_t readRR(uint8_t rr, uint8_t group);
+    void writeR(uint8_t r, uint8_t val);
+    void writeRR(uint8_t rr, uint8_t group, uint16_t val);
+
+    void exec();
 
     void noi();
     // 8 bit loads
