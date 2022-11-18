@@ -10,6 +10,13 @@ typedef struct registers registers;
 #define r8Source (opcode) && 0b111
 #define r16 (opcode >> 4u) && 0b11
 
+// // flags
+// #define testZ(a) (a == 0)
+// #define testCAdd(a, b) ( UINT8_MAX  )
+// #define testCSub(a, b) (a < b)
+// #define testHSub(a, b) ( (a & 0x0F) < (b & 0x0F) )
+
+
 class CPU {
 
 private:
@@ -335,6 +342,22 @@ private:
 
 public:
     CPU();
+
+    // ALU
+    void writeFlags(uint8_t z, uint8_t n, uint8_t h, uint8_t c);
+    bool readZFlag();
+    bool readNFlag();
+    bool readHFlag();
+    bool readCFlag();
+    
+    void ADD(uint16_t a, uint16_t b);
+    void ADD(uint8_t a, uint8_t b);
+    void SUB(uint16_t a, uint16_t b);
+    void SUB(uint8_t a, uint8_t b);
+    void AND(uint8_t a, uint8_t b);
+    void XOR(uint8_t a, uint8_t b);
+    void OR(uint8_t a, uint8_t b);
+    void CP(uint8_t a, uint8_t b);
 
     void step();
 
