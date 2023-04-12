@@ -1,414 +1,497 @@
-#include <iostream>
+#include "constants.h"
+#include "helpers.h"
+#include "cpu.h"
 
-typedef unsigned char BYTE; // 1 byte
-typedef char SIGNED_BYTE; // 1 byte
-typedef unsigned short WORD; // 2 bytes
-typedef signed short SIGNED_WORD; // 2 bytes
-
-#define A 0
-#define F 1
-#define B 2
-#define C 3
-#define D 4
-#define E 5
-#define H 6
-#define L 7
-
-class CPU {
-public:
-    void run_fde() {
-        
-        // fetch
-        opcode = fetch();
-        
-        // decode
-        
-
-        // execute
-        // will be one instruction
-    
-    }
-
-private:
-    WORD SP;
-    WORD PC;
-    BYTE opcode;
-
-    /*
-        Registers A, B, C, D, E, H, L
-    */
-    WORD R[7];
-
-    // Fetch helper
-    WORD fetch() {return 0; /* FIXME */ }
-
-    /*
-        Execute helpers
-        reference: https://rgbds.gbdev.io/docs/v0.6.1/gbz80.7/
-    */
-    void set_r8(BYTE r8, BYTE b);
-    void set_r16(BYTE r16, WORD w);
-    void carry_helper();
-
-    // 8 bit Arithmetic and Logic Instructions
-    
-    // void adc_A_r8();
-    // void adc_A_mHL();
-    // void adc_A_n8();
-
-    void add_A_r8(bool carry);
-    void add_A_mHL(bool carry);
-    void add_A_n8(bool carry);
-
-    void and_A_r8();
-    void and_A_mHL();
-    void and_A_n8();
-
-    void cp_A_r8();
-    void cp_A_mHL();
-    void cp_A_n8();
-    
-    void dec_r8();
-    void dec_mHL();
-    void inc_r8();
-    void inc_mHL();
-    
-    void or_A_r8();
-    void or_A_mHL();
-    void or_A_n8();
-    
-    void sub_A_r8(bool carry);
-    void sub_A_mHL(bool carry);
-    void sub_A_n8(bool carry);
-    
-    void xor_A_r8();
-    void xor_A_mHL();
-    void xor_A_n8();
-
-    // 16 bit Arithmetic Instructions
-    void add_HL_r16();
-    void dec_r16();
-    void inc_r16();
-
-    // Bit Operations Instructions
-    void bit_u3_r8();
-    void bit_u3_mHL();
-
-    // Bit Shift Instructions
-
-    // Load Instructions
-
-    // Jump and Subroutines
-
-    // Stack Operations Instructions
-
-    // Miscellaneous Instructions
-
-};
 
 /*
-    List of abbreviations used in this document.
-
-    r8
-    Any of the 8-bit registers (A, B, C, D, E, H, L).
-    r16
-    Any of the general-purpose 16-bit registers (BC, DE, HL).
-    n8
-    8-bit integer constant.
-    n16
-    16-bit integer constant.
-    e8
-    8-bit offset (-128 to 127).
-    u3
-    3-bit unsigned integer constant (0 to 7).
-    cc
-    Condition codes:
-    Z
-    Execute if Z is set.
-    NZ
-    Execute if Z is not set.
-    C
-    Execute if C is set.
-    NC
-    Execute if C is not set.
-    ! cc
-    Negates a condition code.
-    vec
-    One of the RST vectors (0x00, 0x08, 0x10, 0x18, 0x20, 0x28, 0x30, and 0x38).
+    Instructions
 */
 
-// Instructions
-
-void _add(BYTE a, BYTE b, bool carry) {
-
-}
-
-void _add(WORD a, WORD b) {
-
-}
-
-void _and(BYTE a, BYTE b) {
-
-}
-
-void _sub(BYTE a, BYTE b, bool carry) {
-
-}
-
-void _sub(WORD a, WORD b) {
-
-}
-
-void _or(BYTE a, BYTE b) {
-
-}
-
-void _xor(BYTE a, BYTE b) {
-
-}
-
-bool get_carry() {
-
-}
-
-BYTE msb(WORD w) {
-    return (w & 0xF0) >> 8;
-}
-
-BYTE lsb(WORD w) {
-    return (w & 0x0F);
-}
-
-WORD concat(BYTE a, BYTE b) {
-    WORD ab = (a << 8) | b;
-
-    return ab;
-}
-
 // 8 bit Arithmetic and Logic Instructions
-void CPU::add_A_r8(bool carry) {
-    uint32_t cycles = 0;
+// FIXME IMPLEMENT ALU AND CARRIES
+void CPU::_add_A_r8(bool carry) {
+    // Z0HC
 
-    BYTE r8; // FIXME, get this from opcode
-    
-    _add(R[A], R[r8], carry); // FIXME set R[A] to this
+    UINT r8;
 
+    BYTE sum = _add(
+        registers.read_8(A),
+        registers.read_8(r8)
+    );
+
+    registers.write_8(A, sum);
 }
 
-void CPU::add_A_mHL(bool carry) {
-    uint32_t cycles = 0;
+void CPU::_add_A_mHL(bool carry) {
+    // Z0HC
 
-    BYTE mHL; // FIXME, get from HL register
-    
-    _add(R[A], mHL, carry); // FIXME set R[A] to this
-    
+    WORD hl = registers.read_16(HL);
+
+    BYTE mHL = mmu.read(hl);
+
+    BYTE sum = _add(
+        registers.read_8(A),
+        mHL 
+    );
+
+    registers.write_8(A, sum);
 }
 
-void CPU::add_A_n8(bool carry) {
-    uint32_t cycles = 0;
+void CPU::_add_A_n8(bool carry) {
+    // Z0HC
 
-    BYTE n8; // FIXME, get n8 from memory
-    
-    _add(R[A], n8, carry); // FIXME set R[A] to this
-    
+    BYTE n8; // FIXME get n8 from opcode
+
+    BYTE sum = _add(
+        registers.read_8(A),
+        mmu.read(n8)
+    );
+
+    registers.write_8(A, sum);
 }
 
-void CPU::and_A_r8() {
-    uint32_t cycles = 0;
+void CPU::_sub_A_r8(bool carry) {
+    // Z0HC
 
-    BYTE n8; // FIXME, get n8 from memory
-    
-    _and(R[A], n8); // FIXME set R[A] to this
+    UINT r8;
+
+    BYTE sum = _sub(
+        registers.read_8(A),
+        registers.read_8(r8)
+    );
+
+    registers.write_8(A, sum);
 }
 
-void CPU::and_A_mHL() { 
-    uint32_t cycles = 0;
+void CPU::_sub_A_mHL(bool carry) {
+    // Z0HC
 
-    BYTE n8; // FIXME, get n8 from memory
-    
-    _and(R[A], n8);
+    WORD hl = registers.read_16(HL);
+
+    BYTE mHL = mmu.read(hl);
+
+    BYTE sum = _sub(
+        registers.read_8(A),
+        mHL 
+    );
+
+    registers.write_8(A, sum);
 }
 
-void CPU::and_A_n8() {
-    uint32_t cycles = 0;
+void CPU::_sub_A_n8(bool carry) {
+    // Z0HC
 
-    BYTE n8; // FIXME, get n8 from memory
-    
-    _and(R[A], n8);
+    BYTE n8; // FIXME get n8 from opcode
+
+    BYTE sum = _sub(
+        registers.read_8(A),
+        mmu.read(n8)
+    );
+
+    registers.write_8(A, sum);
 }
 
-void CPU::cp_A_r8() {
-    uint32_t cycles = 0;
-
-    BYTE r8; // FIXME, get r8 from opcode
+UINT CPU::adc_A_r8() {
+    _add_A_r8(true);
     
-    _sub(R[A], R[r8], false);
+    // 4 T Cycles
+    return 4;
 }
 
-void CPU::cp_A_mHL() {
-    uint32_t cycles = 0;
+UINT CPU::adc_A_mHL() {
+    _add_A_mHL(true);
 
-    BYTE mHL; // FIXME, get mHL
-    
-    _sub(R[A], mHL, false);
+    // 8 T Cycles
+    return 8;
 }
 
-void CPU::cp_A_n8() {
-    uint32_t cycles = 0;
+UINT CPU::adc_A_n8() {
+    _add_A_n8(true);
 
-    BYTE n8; // FIXME, get n8 from memory and memory
-    
-    _sub(R[A], n8, false);
+    // 8 T Cycles;
+    return 8;
 }
 
-void CPU::dec_r8() {
-    uint32_t cycles = 0;
-
-    BYTE r8; // FIXME, get r8 from opcode and memory
+UINT CPU::add_A_r8() {
+    _add_A_r8(false);
     
-    _sub(R[r8], 1, false);    
+    // 4 T Cycles
+    return 4;
 }
 
-void CPU::dec_mHL() {
-    uint32_t cycles = 0;
+UINT CPU::add_A_mHL() {
+    _add_A_mHL(false);
 
-    BYTE mHL; // FIXME, get mHL
-    
-    _sub(mHL, 1, false);
-
-    // FIXME set mHl to decr   
+    // 8 T Cycles
+    return 8;
 }
 
-void CPU::inc_r8() {
-    uint32_t cycles = 0;
+UINT CPU::add_A_n8() {
+    _add_A_n8(false);
 
-    BYTE r8; // FIXME, get r8
-    
-    _add(R[r8], 1, false);
+    // 8 T Cycles;
+    return 8;
 }
 
-void CPU::inc_mHL() {
-    uint32_t cycles = 0;
+UINT CPU::and_A_r8() {
+    // Z010
 
-    BYTE mHL; // FIXME, get mHL
-    
-    _add(mHL, 1, false);
+    UINT r8; // get r8 from opcode fIXME
 
-    // FIXME set mHl to inc 
+    BYTE a = _and(
+        registers.read_8(A),
+        registers.read_8(r8)
+    );
+
+    registers.write_8(A, a);
+
+    // 4 T Cycles
+    return 4;
 }
 
+UINT CPU::and_A_mHL() { 
+    // Z010
 
-void CPU::or_A_r8() {
-    uint32_t cycles = 0;
+    WORD hl = registers.read_16(HL);
 
-    BYTE r8; // FIXME, get r8
+    BYTE mHL = mmu.read(hl);
+
+    BYTE a = _and(
+        registers.read_8(A),
+        mHL
+    );
     
-    _or(R[A], R[r8]);
+    registers.write_8(A, a);
+
+    // 8 T Cycles
+    return 8;
 }
 
-void CPU::or_A_mHL() {
-    uint32_t cycles = 0;
+UINT CPU::and_A_n8() {
+    // Z010
 
-    BYTE mHL; // FIXME, get mHL
-    
-    _or(R[A], mHL);
+    BYTE n8; // FIXME get n8 from opcode
+
+    BYTE a = _and(
+        registers.read_8(A),
+        mmu.read(n8)
+    );
+
+    registers.write_8(A, a);
+
+    // 8 T Cycles
+    return 8;
 }
 
-void CPU::or_A_n8() {
-    uint32_t cycles = 0;
+UINT CPU::cp_A_r8() {
+    // Z1HC
 
-    BYTE n8; // FIXME, get n8 memory
-    
-    _or(R[A], n8);
+    UINT r8; // FIXME get r8 from opcode
+
+    _sub(
+        registers.read_8(A),
+        registers.read_8(r8)  
+    );
+
+    // 4 T Cycles
+    return 4;
 }
 
-void CPU::sub_A_r8(bool carry) {
-    uint32_t cycles = 0;
+UINT CPU::cp_A_mHL() {
+    // Z1HC
 
-    BYTE r8; // FIXME, get this from opcode
-    
-    _sub(R[A], R[r8], carry); // FIXME set R[A] to this
+    WORD hl = registers.read_16(HL);
 
+    BYTE mHL = mmu.read(hl);
+
+    _sub(
+        registers.read_8(A),
+        mHL 
+    );
+
+    // 8 T Cycles
+    return 8;
 }
 
-void CPU::sub_A_mHL(bool carry) {
-    uint32_t cycles = 0;
+UINT CPU::cp_A_n8() {
+    // Z1HC
 
-    BYTE mHL; // FIXME, get from HL register
-    
-    _sub(R[A], mHL, carry); // FIXME set R[A] to this
-    
+    BYTE n8; // FIXME get n8 from opcode
+
+    _sub(
+        registers.read_8(A),
+        mmu.read(n8)
+    );
+
+    // 8 T Cycles
+    return 8;
 }
 
-void CPU::sub_A_n8(bool carry) {
-    uint32_t cycles = 0;
+UINT CPU::dec_r8() {
+    // ZNH-
 
-    BYTE n8; // FIXME, get n8 from memory
-    
-    _sub(R[A], n8, carry); // FIXME set R[A] to this
-    
+    UINT r8; // FIXME get r8 from opcode
+
+    BYTE diff = _sub(
+        registers.read_8(r8),
+        1
+    );
+
+    registers.write_8(r8, diff);
+
+    // 4 T Cycles
+    return 4;
 }
 
-void CPU::xor_A_r8() {
-    uint32_t cycles = 0;
+UINT CPU::dec_mHL() {
+    // ZNH-
 
-    BYTE r8; // FIXME, get r8 opcode
-    
-    _xor(R[A], R[r8]);
+    WORD hl = registers.read_16(HL);
+
+    BYTE mHL = mmu.read(hl);
+
+    BYTE diff = _sub(
+        mHL,
+        1
+    );
+
+    mmu.write(hl, diff);
+
+    // 12 T Cycles
+    return 12;
 }
 
-void CPU::xor_A_mHL() {
-    uint32_t cycles = 0;
+UINT CPU::inc_r8() {
+    // Z0H-
 
-    BYTE mHL; // FIXME, get mHL memory
-    
-    _xor(R[A], mHL);
+    UINT r8; // FIXME get r8 from opcode
+
+    BYTE sum = _add(
+        registers.read_8(r8),
+        1
+    );
+
+    registers.write_8(r8, sum);
+
+    // 4 T Cycles
+    return 4;
 }
 
-void CPU::xor_A_n8() {
-    uint32_t cycles = 0;
+UINT CPU::inc_mHL() {
+    // Z0H-
 
-    BYTE n8; // FIXME, get n8 from memory
+    WORD hl = registers.read_16(HL);
+
+    BYTE mHL = mmu.read(hl);
+
+    BYTE sum = _add(
+        mHL,
+        1
+    );
+
+    mmu.write(hl, sum);
+
+    // 12 T Cycles
+    return 12;
+}
+
+UINT CPU::or_A_r8() {
+    // Z000
+
+    UINT r8; // FIXME get r8 from opcode
+
+    BYTE o = _or(
+        registers.read_8(A),
+        registers.read_8(r8)
+    );
+
+    registers.write_8(A, o);
+
+    // 4 T Cycles
+    return 4;
+}
+
+UINT CPU::or_A_mHL() {
+    // Z000
+
+    WORD hl = registers.read_16(HL);
+
+    BYTE mHL = mmu.read(hl);
+
+    BYTE o = _or(
+        registers.read_8(A),
+        mHL
+    );
+
+    registers.write_8(A, o);
+
+    // 8 T Cycles
+    return 8;
+}
+
+UINT CPU::or_A_n8() {
+    // Z000
+
+    BYTE n8; // FIXME get n8 from opcode
+
+    BYTE o = _or(
+        registers.read_8(A),
+        mmu.read(n8)
+    );
+
+    registers.write_8(A, o);
+
+    // 8 T Cycles
+    return 8;
+}
+
+UINT CPU::sbc_A_r8() {
+    // Z1HC
+
+    _sub_A_r8(true);
+
+    // 4 T Cycles
+    return 4;
+}
+
+UINT CPU::sbc_A_mHL() {
+     // Z1HC
+
+    _sub_A_mHL(true);
+
+    // 8 T Cycles
+    return 8;
+}
+
+UINT CPU::sbc_A_n8() {
+    // Z1HC
+
+    _sub_A_n8(true);
+
+    // 8 T Cycles
+    return 8;
+}
+
+UINT CPU::sub_A_r8() {
+    // Z1HC
+
+    _sub_A_r8(false);
+
+    // 4 T Cycles
+    return 4;
+}
+
+UINT CPU::sub_A_mHL() {
+     // Z1HC
+
+    _sub_A_mHL(false);
+
+    // 8 T Cycles
+    return 8;
+}
+
+UINT CPU::sub_A_n8() {
+    // Z1HC
+
+    _sub_A_n8(false);
+
+    // 8 T Cycles
+    return 8;
+}
+
+UINT CPU::xor_A_r8() {
+    // Z000
     
-    _xor(R[A], n8);
+    UINT r8; // FIXME r8
+
+    BYTE x = _xor(
+        registers.read_8(A),
+        registers.read_8(r8)
+    );
+
+    registers.write_8(A, x);
+
+    // 4 T Cycles
+    return 4;
+}
+
+UINT CPU::xor_A_mHL() {
+    // Z000
+
+    WORD hl = registers.read_16(HL);
+
+    BYTE mHL = mmu.read(hl);
+
+    BYTE x = _xor(
+        registers.read_8(A),
+        mHL
+    );
+
+    registers.write_8(A, x);
+    
+    // 8 T Cycles
+    return 8;
+}
+
+UINT CPU::xor_A_n8() {
+    // Z000
+
+    BYTE n8; // FIXME read n8 from opcode
+
+    BYTE x = _xor(
+        registers.read_8(A),
+        mmu.read(n8)
+    );
+
+    registers.write_8(A, x);
+    
+    // 8 T Cycles
+    return 8;
 }
 
 // 16 bit Arithmetic Instructions
-void CPU::add_HL_r16() {
-    uint32_t CYCLES = 0;
+UINT CPU::add_HL_r16() {
+    // -0HC
 
-    WORD HL = concat(R[H], R[L]);
-    WORD r16; // FIXME, get r16 from opcode
+    UINT r16; // FIXME get r16 from opcode
 
-    _add(HL, r16);
+    WORD sum = _add(
+        registers.read_16(HL),
+        registers.read_16(r16)
+    );
+
+    registers.write_16(HL, sum);
+
+    // 8 T Cycles
+    return 8;
 }
 
-void CPU::dec_r16() {
-    uint32_t CYCLES = 0;
-
-    WORD r16; // FIXME, get r16 from opcode
-
-    BYTE r1 = msb(r16),
-         r2 = lsb(r16);
-
-    WORD mr16 = concat(R[r1], R[r2]);
+UINT CPU::dec_r16() {
     
-    _sub(mr16, 1);
+    UINT r16; // FIXME get r16 from opcode
 
-    set_r16(r16, mr16);
+    WORD diff = _sub(
+        registers.read_16(r16),
+        1
+    );
+
+    registers.write_16(r16, diff);
+
+    // 8 T Cycles
+    return 8;
 }
 
-void CPU::inc_r16() {
-    uint32_t CYCLES = 0;
+UINT CPU::inc_r16() {
 
-    WORD r16; // FIXME, get r16 from opcode
+    UINT r16; // FIXME get r16 from opcode
 
-    BYTE r1 = msb(r16),
-         r2 = lsb(r16);
+    WORD sum = _add(
+        registers.read_16(r16),
+        1
+    );
 
-    WORD mr16 = concat(R[r1], R[r2]);
-    
-    _add(mr16, 1);
+    registers.write_16(r16, sum);
 
-    set_r16(r16, mr16);
+    // 8 T Cycles
+    return 8;
 }

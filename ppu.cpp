@@ -1,3 +1,5 @@
+#include <deque>
+
 typedef unsigned char BYTE; // 1 byte
 typedef char SIGNED_BYTE; // 1 byte
 typedef unsigned short WORD; // 2 bytes
@@ -37,8 +39,10 @@ void PPU::render_line() {
 
     
     */
+    std::deque<BYTE> line;
 
-    for(BYTE lx = 0; lx < 160; lx++) { // FIXME CHANGE TO TILES
+    for(int tile = 0; tile < 21; tile++) { // FIXME CHANGE TO TILES
+        BYTE lx = tile * 8;
         BYTE tile_id = (scx + lx) / 8 + (scy + ly) / 8 * 20;
         
         // TODO: Implement wrapping
@@ -60,17 +64,24 @@ void PPU::render_line() {
         BYTE tile_lsb; // = Memory[0x8000 + tile_number * 2]
         BYTE tile_msb; // = Memory[0x8000 + tile_number * 2 + 1]
 
-        BYTE pixels[8]; // 8 pixels
+        // produce 8 pixels of tile
         for(int i = 7; i >= 0; i--) {
             bool lsb = (tile_lsb >> i) & 0x01,
                  msb = (tile_msb >> i) & 0x01;
                 
             BYTE c = (msb << 1u) | lsb;
 
-            pixels[8 - i - 1] = c;
+            line.push_back(c);
         }
-
     }
+
+    for(int i = 0; i < scx % 8; i++)
+        line.pop_front();
+    for(int i = 0; i < line.size() - 160; i++)
+        line.pop_back();
+
+    // render line to video
+    // line
 }
 
 void PPU::tick() {
