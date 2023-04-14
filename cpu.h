@@ -35,36 +35,40 @@ private:
     class Registers {
     public:
         BYTE read_8(UINT reg) {
+            reg = register_8(reg);
             return R[reg];
         }
 
         void write_8(UINT reg, BYTE b) {
+            reg = register_8(reg);
             R[reg] = b;
         }
 
         WORD read_16(UINT reg) {
+            reg = register_16(reg);
             return concat(R[reg], R[reg + 1]);
         }
 
         void write_16(UINT reg, WORD w) {
+            reg = register_16(reg);
             R[reg] = msb(w);
             R[reg + 1] = lsb(w);
         }
 
         void set_z_flag(bool on) {
-            set_bit(R[F], 7, on);
+            R[F] = set_bit(R[F], 7, on);
         }
 
         void set_n_flag(bool on) {
-            set_bit(R[F], 6, on);
+            R[F] = set_bit(R[F], 6, on);
         }
 
         void set_h_flag(bool on) {
-            set_bit(R[F], 5, on);
+            R[F] = set_bit(R[F], 5, on);
         }
 
         void set_c_flag(bool on) {
-            set_bit(R[F], 4, on);
+            R[F] = set_bit(R[F], 4, on);
         }
 
         bool get_z_flag() {
@@ -96,6 +100,43 @@ private:
                 F = 7
         */
         BYTE R[7];
+
+        // register encodings
+        UINT register_8(UINT r) {
+            switch(r) {
+                case 0:
+                    return B;
+                case 1:
+                    return C;
+                case 2:
+                    return D;
+                case 3:
+                    return E;
+                case 4:
+                    return H;
+                case 5:
+                    return L;
+                case 7:
+                    return A;
+                default:
+                    throw "Unknown register 8";
+            }
+        }
+
+        UINT register_16(UINT r) {
+            switch(r) {
+                case 0:
+                    return BC;
+                case 1:
+                    return DE;
+                case 2:
+                    return HL;
+                case 3:
+                    return AF;
+                default:
+                    throw "Unknown register 16";
+            }
+        }
     };
 
     WORD SP;
@@ -113,7 +154,14 @@ private:
     */
 
     // 8 bit Arithmetic and Logic Instructions
-    
+    BYTE _add_8(BYTE, BYTE, bool);
+    BYTE _sub_8(BYTE, BYTE, bool);
+    BYTE _and(BYTE, BYTE);
+    BYTE _or(BYTE, BYTE);
+    BYTE _xor(BYTE, BYTE);
+    BYTE _dec(BYTE);
+    BYTE _inc(BYTE);
+
     void _add_A_r8(bool);
     void _add_A_mHL(bool);
     void _add_A_n8(bool);
@@ -160,11 +208,18 @@ private:
     UINT xor_A_n8();
 
     // 16 bit Arithmetic Instructions
+    WORD _add_16(WORD, WORD);
+
     UINT add_HL_r16();
     UINT dec_r16();
     UINT inc_r16();
 
     // Bit Operations Instructions
+    void _bit(BYTE, UINT);
+    BYTE _res(BYTE, UINT);
+    BYTE _set(BYTE, UINT);
+    BYTE _swap(BYTE);
+
     UINT bit_u3_r8();
     UINT bit_u3_mHL();
 
@@ -178,6 +233,11 @@ private:
     UINT swap_mHL();
 
     // Bit Shift Instructions
+    BYTE _rl(BYTE, bool);
+    BYTE _rr(BYTE, bool);
+    BYTE _sl(BYTE);
+    BYTE _sr(BYTE, bool);
+
     UINT rl_r8();
     UINT rl_mHL();
     UINT rla();
@@ -202,11 +262,60 @@ private:
     UINT srl_mHL();
 
     // Load Instructions
+    UINT ld_r8_r8();
+    UINT ld_r8_n8();
+    UINT ld_r16_n16();
+    UINT ld_mHL_r8();
+    UINT ld_mHL_n8();
+    UINT ld_r8_mHL();
+    UINT ld_mr16_A();
+    UINT ld_mn16_A();
+    UINT ldh_mn16_A();
+    UINT ldh_mC_A();
+    UINT ld_A_mr16();
+    UINT ld_A_mn16();
+    UINT ldh_A_mn16();
+    UINT ldh_A_mC();
+    UINT ld_mHLI_A();
+    UINT ld_mHLD_A();
+    UINT ld_A_mHLI();
+    UINT ld_A_mHLD();
 
     // Jump and Subroutines
+    UINT call_n16();
+    UINT call_cc_n16();
+    UINT jp_HL();
+    UINT jp_n16();
+    UINT jp_cc_n16();
+    UINT jr_n16();
+    UINT jr_cc_n16();
+    UINT ret_cc();
+    UINT ret();
+    UINT reti();
+    UINT rst();
 
     // Stack Operations Instructions
+    UINT add_HL_sp();
+    UINT add_SP_e8();
+    UINT dec_SP();
+    UINT inc_SP();
+    UINT ld_SP_n16();
+    UINT ld_mn16_SP();
+    UINT ld_HL_SPe8();
+    UINT ld_SP_HL();
+    UINT pop_AF();
+    UINT pop_r16();
+    UINT push_AF();
+    UINT push_r16();
 
     // Miscellaneous Instructions
-
+    UINT ccf();
+    UINT cpl();
+    UINT daa();
+    UINT di();
+    UINT ei();
+    UINT halt();
+    UINT nop();
+    UINT scf();
+    UINT stop();
 };

@@ -1,30 +1,30 @@
 #include "constants.h"
 
-UINT _add(BYTE a, BYTE b) {
+BYTE _add(BYTE a, BYTE b) {
 
 }
 
-UINT _add(WORD a, WORD b) {
+WORD _add(WORD a, WORD b) {
 
 }
 
-UINT _and(BYTE a, BYTE b) {
+BYTE _and(BYTE a, BYTE b) {
 
 }
 
-UINT _sub(BYTE a, BYTE b) {
+BYTE _sub(BYTE a, BYTE b) {
 
 }
 
-UINT _sub(WORD a, WORD b) {
+BYTE _sub(WORD a, WORD b) {
 
 }
 
-UINT _or(BYTE a, BYTE b) {
+BYTE _or(BYTE a, BYTE b) {
 
 }
 
-UINT _xor(BYTE a, BYTE b) {
+BYTE _xor(BYTE a, BYTE b) {
 
 }
 
@@ -50,9 +50,29 @@ bool get_bit(BYTE b, UINT bit) {
     return (b >> bit) & 0x01;
 }
 
-void set_bit(BYTE &b, UINT bit, bool on) {
+BYTE set_bit(BYTE b, UINT bit, bool on) {
     if(on)
         b |= (1u << bit);
     else 
         b &= ~(1u << bit);
+}
+
+BYTE _swap(BYTE b) {
+    return ((b & 0x0F) << 4u) | ((b & 0xF0) >> 4u);
+}
+
+BYTE _rotate_left(BYTE b) {
+
+}
+
+BYTE _rotate_right(BYTE b) {
+
+}
+
+BYTE _shift_left(BYTE b) {
+
+}
+
+BYTE _shift_right(BYTE b) {
+    
 }
