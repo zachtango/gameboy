@@ -19,7 +19,7 @@ private:
         0xE000 - 0xFDFF ECHO RAM
         0xFE00 - 0xFE9F Sprite Attribute Table (OAM)
         0xFEA0 - 0xFEFF Not Usable
-        0xFF00 - 0xFF7F I/O Registers
+        0xFF00 - 0xFF7F I/O Registers (0xFF0F is Interrupt Flag)
         0xFF80 - 0xFFFE HRAM
         0xFFFF Interrupt Enable register
     */

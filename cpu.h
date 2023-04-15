@@ -18,39 +18,29 @@
 
 class CPU {
 public:
-    UINT run_fde() {
-        
-        // fetch
-        opcode = fetch();
-        
-        // decode
-        
+    UINT run_fde();
 
-        // execute
-        // will be one instruction
-    
-    }
+    // CPU states
+    bool halt_mode;
+    bool sleep_mode;
+    bool IME;
 
-private:
+// private:
     class Registers {
     public:
         BYTE read_8(UINT reg) {
-            reg = register_8(reg);
             return R[reg];
         }
 
         void write_8(UINT reg, BYTE b) {
-            reg = register_8(reg);
             R[reg] = b;
         }
 
         WORD read_16(UINT reg) {
-            reg = register_16(reg);
             return concat(R[reg], R[reg + 1]);
         }
 
         void write_16(UINT reg, WORD w) {
-            reg = register_16(reg);
             R[reg] = msb(w);
             R[reg + 1] = lsb(w);
         }
@@ -100,53 +90,50 @@ private:
                 F = 7
         */
         BYTE R[7];
-
-        // register encodings
-        UINT register_8(UINT r) {
-            switch(r) {
-                case 0:
-                    return B;
-                case 1:
-                    return C;
-                case 2:
-                    return D;
-                case 3:
-                    return E;
-                case 4:
-                    return H;
-                case 5:
-                    return L;
-                case 7:
-                    return A;
-                default:
-                    throw "Unknown register 8";
-            }
-        }
-
-        UINT register_16(UINT r) {
-            switch(r) {
-                case 0:
-                    return BC;
-                case 1:
-                    return DE;
-                case 2:
-                    return HL;
-                case 3:
-                    return AF;
-                default:
-                    throw "Unknown register 16";
-            }
-        }
     };
+
+    // register encodings
+    UINT _register_8(UINT r) {
+        switch(r) {
+            case 0:
+                return B;
+            case 1:
+                return C;
+            case 2:
+                return D;
+            case 3:
+                return E;
+            case 4:
+                return H;
+            case 5:
+                return L;
+            case 7:
+                return A;
+            default:
+                throw "Unknown register 8";
+        }
+    }
+
+    UINT _register_16(UINT r) {
+        switch(r) {
+            case 0:
+                return BC;
+            case 1:
+                return DE;
+            case 2:
+                return HL;
+            case 3:
+                return AF;
+            default:
+                throw "Unknown register 16";
+        }
+    }
 
     WORD SP;
     WORD PC;
     BYTE opcode;
     Registers registers;
     MMU &mmu;
-
-    // Fetch helper
-    WORD fetch() {return 0; /* FIXME */ }
 
     /*
         Instruction Reference: 
@@ -282,6 +269,9 @@ private:
     UINT ld_A_mHLD();
 
     // Jump and Subroutines
+    bool _condition(UINT);
+    void _call(WORD);
+
     UINT call_n16();
     UINT call_cc_n16();
     UINT jp_HL();

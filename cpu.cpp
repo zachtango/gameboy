@@ -7,6 +7,20 @@
     Instructions
 */
 
+UINT CPU::run_fde() {
+        
+    // fetch
+    opcode = mmu.read(PC);    
+    
+    // decode
+    
+
+    // execute
+    // will be one instruction
+    
+
+}
+
 // 8 bit Arithmetic and Logic Instructions
 BYTE CPU::_add_8(BYTE a, BYTE b, bool carry) {
     // Z0HC
@@ -127,7 +141,7 @@ BYTE CPU::_inc(BYTE i) {
 void CPU::_add_A_r8(bool carry) {
     // Z0HC
 
-    UINT r8 = opcode & 0x07;
+    UINT r8 = _register_8(opcode & 0x07);
 
     BYTE sum = _add_8(
         registers.read_8(A),
@@ -157,7 +171,7 @@ void CPU::_add_A_mHL(bool carry) {
 void CPU::_add_A_n8(bool carry) {
     // Z0HC
 
-    BYTE n8 = mmu.read(PC + 1);
+    BYTE n8 = mmu.read(PC);
 
     BYTE sum = _add_8(
         registers.read_8(A),
@@ -165,13 +179,15 @@ void CPU::_add_A_n8(bool carry) {
         carry
     );
 
+    PC += 1;
+
     registers.write_8(A, sum);
 }
 
 void CPU::_sub_A_r8(bool carry) {
     // Z1HC
 
-    UINT r8 = opcode & 0x07;
+    UINT r8 = _register_8(opcode & 0x07);
 
     BYTE diff = _sub_8(
         registers.read_8(A),
@@ -201,7 +217,7 @@ void CPU::_sub_A_mHL(bool carry) {
 void CPU::_sub_A_n8(bool carry) {
     // Z1HC
 
-    BYTE n8 = mmu.read(PC + 1); // FIXME get n8 from opcode
+    BYTE n8 = mmu.read(PC); // FIXME get n8 from opcode
 
     BYTE diff = _sub_8(
         registers.read_8(A),
@@ -209,22 +225,20 @@ void CPU::_sub_A_n8(bool carry) {
         carry
     );
 
+    PC += 1;
+
     registers.write_8(A, diff);
 }
 
 UINT CPU::adc_A_r8() {
     _add_A_r8(true);
     
-    PC += 1;
-
     // 4 T Cycles
     return 4;
 }
 
 UINT CPU::adc_A_mHL() {
     _add_A_mHL(true);
-
-    PC += 1;
 
     // 8 T Cycles
     return 8;
@@ -233,8 +247,6 @@ UINT CPU::adc_A_mHL() {
 UINT CPU::adc_A_n8() {
     _add_A_n8(true);
 
-    PC += 2;
-
     // 8 T Cycles;
     return 8;
 }
@@ -242,16 +254,12 @@ UINT CPU::adc_A_n8() {
 UINT CPU::add_A_r8() {
     _add_A_r8(false);
     
-    PC += 1;
-
     // 4 T Cycles
     return 4;
 }
 
 UINT CPU::add_A_mHL() {
     _add_A_mHL(false);
-
-    PC += 1;
 
     // 8 T Cycles
     return 8;
@@ -260,8 +268,6 @@ UINT CPU::add_A_mHL() {
 UINT CPU::add_A_n8() {
     _add_A_n8(false);
 
-    PC += 2;
-
     // 8 T Cycles;
     return 8;
 }
@@ -269,7 +275,7 @@ UINT CPU::add_A_n8() {
 UINT CPU::and_A_r8() {
     // Z010
 
-    UINT r8 = opcode & 0x07; // get r8 from opcode fIXME
+    UINT r8 = _register_8(opcode & 0x07); // get r8 from opcode fIXME
 
     BYTE a = _and(
         registers.read_8(A),
@@ -277,8 +283,6 @@ UINT CPU::and_A_r8() {
     );
 
     registers.write_8(A, a);
-
-    PC += 1;
 
     // 4 T Cycles
     return 4;
@@ -298,8 +302,6 @@ UINT CPU::and_A_mHL() {
     
     registers.write_8(A, a);
 
-    PC += 1;
-
     // 8 T Cycles
     return 8;
 }
@@ -307,7 +309,7 @@ UINT CPU::and_A_mHL() {
 UINT CPU::and_A_n8() {
     // Z010
 
-    BYTE n8 = mmu.read(PC + 1); // FIXME get n8 from opcode
+    BYTE n8 = mmu.read(PC); // FIXME get n8 from opcode
 
     BYTE a = _and(
         registers.read_8(A),
@@ -316,7 +318,7 @@ UINT CPU::and_A_n8() {
 
     registers.write_8(A, a);
 
-    PC += 2;
+    PC += 1;
 
     // 8 T Cycles
     return 8;
@@ -325,15 +327,13 @@ UINT CPU::and_A_n8() {
 UINT CPU::cp_A_r8() {
     // Z1HC
 
-    UINT r8 = opcode & 0x07; // FIXME get r8 from opcode
+    UINT r8 = _register_8(opcode & 0x07); // FIXME get r8 from opcode
 
     _sub_8(
         registers.read_8(A),
         registers.read_8(r8),
         false
     );
-
-    PC += 1;
 
     // 4 T Cycles
     return 4;
@@ -352,8 +352,6 @@ UINT CPU::cp_A_mHL() {
         false
     );
 
-    PC += 1;
-
     // 8 T Cycles
     return 8;
 }
@@ -361,7 +359,7 @@ UINT CPU::cp_A_mHL() {
 UINT CPU::cp_A_n8() {
     // Z1HC
 
-    BYTE n8 = mmu.read(PC + 1); // FIXME get n8 from opcode
+    BYTE n8 = mmu.read(PC); // FIXME get n8 from opcode
 
     _sub_8(
         registers.read_8(A),
@@ -369,7 +367,7 @@ UINT CPU::cp_A_n8() {
         false
     );
 
-    PC += 2;
+    PC += 1;
 
     // 8 T Cycles
     return 8;
@@ -378,13 +376,11 @@ UINT CPU::cp_A_n8() {
 UINT CPU::dec_r8() {
     // ZNH-
 
-    UINT r8 = opcode & 0x07; // FIXME get r8 from opcode
+    UINT r8 = _register_8(opcode & 0x07); // FIXME get r8 from opcode
 
     BYTE dec = _dec(registers.read_8(r8));
 
     registers.write_8(r8, dec);
-
-    PC += 1;
 
     // 4 T Cycles
     return 4;
@@ -401,8 +397,6 @@ UINT CPU::dec_mHL() {
 
     mmu.write(hl, dec);
 
-    PC += 1;
-
     // 12 T Cycles
     return 12;
 }
@@ -410,13 +404,11 @@ UINT CPU::dec_mHL() {
 UINT CPU::inc_r8() {
     // Z0H-
 
-    UINT r8 = opcode & 0x07; // FIXME get r8 from opcode
+    UINT r8 = _register_8(opcode & 0x07); // FIXME get r8 from opcode
 
     BYTE inc = _inc(registers.read_8(r8));
 
     registers.write_8(r8, inc);
-
-    PC += 1;
 
     // 4 T Cycles
     return 4;
@@ -433,8 +425,6 @@ UINT CPU::inc_mHL() {
 
     mmu.write(hl, inc);
 
-    PC += 1;
-
     // 12 T Cycles
     return 12;
 }
@@ -442,7 +432,7 @@ UINT CPU::inc_mHL() {
 UINT CPU::or_A_r8() {
     // Z000
 
-    UINT r8 = opcode & 0x07; // FIXME get r8 from opcode
+    UINT r8 = _register_8(opcode & 0x07); // FIXME get r8 from opcode
 
     BYTE o = _or(
         registers.read_8(A),
@@ -450,8 +440,6 @@ UINT CPU::or_A_r8() {
     );
 
     registers.write_8(A, o);
-
-    PC += 1;
 
     // 4 T Cycles
     return 4;
@@ -471,8 +459,6 @@ UINT CPU::or_A_mHL() {
 
     registers.write_8(A, o);
 
-    PC += 1;
-
     // 8 T Cycles
     return 8;
 }
@@ -480,7 +466,7 @@ UINT CPU::or_A_mHL() {
 UINT CPU::or_A_n8() {
     // Z000
 
-    BYTE n8 = mmu.read(PC + 1); // FIXME get n8 from opcode
+    BYTE n8 = mmu.read(PC); // FIXME get n8 from opcode
 
     BYTE o = _or(
         registers.read_8(A),
@@ -489,7 +475,7 @@ UINT CPU::or_A_n8() {
 
     registers.write_8(A, o);
 
-    PC += 2;
+    PC += 1;
 
     // 8 T Cycles
     return 8;
@@ -500,8 +486,6 @@ UINT CPU::sbc_A_r8() {
 
     _sub_A_r8(true);
 
-    PC += 1;
-
     // 4 T Cycles
     return 4;
 }
@@ -510,8 +494,6 @@ UINT CPU::sbc_A_mHL() {
      // Z1HC
 
     _sub_A_mHL(true);
-
-    PC += 1;
 
     // 8 T Cycles
     return 8;
@@ -522,8 +504,6 @@ UINT CPU::sbc_A_n8() {
 
     _sub_A_n8(true);
 
-    PC += 2;
-
     // 8 T Cycles
     return 8;
 }
@@ -532,8 +512,6 @@ UINT CPU::sub_A_r8() {
     // Z1HC
 
     _sub_A_r8(false);
-
-    PC += 1;
 
     // 4 T Cycles
     return 4;
@@ -544,8 +522,6 @@ UINT CPU::sub_A_mHL() {
 
     _sub_A_mHL(false);
 
-    PC += 1;
-
     // 8 T Cycles
     return 8;
 }
@@ -555,8 +531,6 @@ UINT CPU::sub_A_n8() {
 
     _sub_A_n8(false);
 
-    PC += 2;
-
     // 8 T Cycles
     return 8;
 }
@@ -564,7 +538,7 @@ UINT CPU::sub_A_n8() {
 UINT CPU::xor_A_r8() {
     // Z000
     
-    UINT r8 = opcode & 0x07; // FIXME r8
+    UINT r8 = _register_8(opcode & 0x07); // FIXME r8
 
     BYTE x = _xor(
         registers.read_8(A),
@@ -572,8 +546,6 @@ UINT CPU::xor_A_r8() {
     );
 
     registers.write_8(A, x);
-
-    PC += 1;
 
     // 4 T Cycles
     return 4;
@@ -593,8 +565,6 @@ UINT CPU::xor_A_mHL() {
 
     registers.write_8(A, x);
     
-    PC += 1;
-
     // 8 T Cycles
     return 8;
 }
@@ -602,7 +572,7 @@ UINT CPU::xor_A_mHL() {
 UINT CPU::xor_A_n8() {
     // Z000
 
-    BYTE n8 = mmu.read(PC + 1); // FIXME read n8 from opcode
+    BYTE n8 = mmu.read(PC); // FIXME read n8 from opcode
 
     BYTE x = _xor(
         registers.read_8(A),
@@ -611,7 +581,7 @@ UINT CPU::xor_A_n8() {
 
     registers.write_8(A, x);
     
-    PC += 2;
+    PC += 1;
 
     // 8 T Cycles
     return 8;
@@ -633,7 +603,7 @@ WORD CPU::_add_16(WORD a, WORD b) {
 UINT CPU::add_HL_r16() {
     // -0HC
 
-    UINT r16 = (opcode >> 3u) & 0x07; // FIXME get r16 from opcode
+    UINT r16 = _register_16( (opcode >> 3u) & 0x07 ); // FIXME get r16 from opcode
 
     WORD sum = _add_16(
         registers.read_16(HL),
@@ -642,21 +612,17 @@ UINT CPU::add_HL_r16() {
 
     registers.write_16(HL, sum);
 
-    PC += 1;
-
     // 8 T Cycles
     return 8;
 }
 
 UINT CPU::dec_r16() {
     
-    UINT r16 = (opcode >> 3u) & 0x07; // FIXME get r16 from opcode
+    UINT r16 = _register_16( (opcode >> 3u) & 0x07 ); // FIXME get r16 from opcode
 
     WORD dec = registers.read_16(r16) - 1;
 
     registers.write_16(r16, dec);
-
-    PC += 1;
 
     // 8 T Cycles
     return 8;
@@ -664,13 +630,11 @@ UINT CPU::dec_r16() {
 
 UINT CPU::inc_r16() {
 
-    UINT r16 = (opcode >> 3u) & 0x07; // FIXME get r16 from opcode
+    UINT r16 = _register_16( (opcode >> 3u) & 0x07 ); // FIXME get r16 from opcode
 
     WORD inc = registers.read_16(r16) + 1;
 
     registers.write_16(r16, inc);
-
-    PC += 1;
 
     // 8 T Cycles
     return 8;
@@ -715,15 +679,13 @@ BYTE CPU::_swap(BYTE b) {
 UINT CPU::bit_u3_r8() {
     // Z01-
 
-    UINT r8 = opcode & 0x07; // GET r8 from opcode
+    UINT r8 = _register_8(opcode & 0x07); // GET r8 from opcode
     UINT u3 = (opcode >> 3u) & 0x07; // GET u3 from opcode
 
     _bit(
         registers.read_8(r8),
         u3
     );
-
-    PC += 1;
 
     // 8 T Cycles
     return 8;
@@ -743,15 +705,13 @@ UINT CPU::bit_u3_mHL() {
         u3
     );
 
-    PC += 1;
-
     // 12 T Cycles
     return 12;
 }
 
 UINT CPU::res_u3_r8() {
     
-    UINT r8 = opcode & 0x07;
+    UINT r8 = _register_8(opcode & 0x07);
     UINT u3 = (opcode >> 3u) & 0x07;
 
     BYTE res = _res(
@@ -760,8 +720,6 @@ UINT CPU::res_u3_r8() {
     );
 
     registers.write_8(r8, res);
-
-    PC += 1;
 
     // 8 T Cycles
     return 8;
@@ -782,15 +740,13 @@ UINT CPU::res_u3_mHL() {
 
     mmu.write(hl, res);
 
-    PC += 1;
-
     // 16 T Cycles
     return 16;
 }
 
 UINT CPU::set_u3_r8() {
 
-    UINT r8 = opcode & 0x07;
+    UINT r8 = _register_8(opcode & 0x07);
     UINT u3 = (opcode >> 3u) & 0x07;
 
     BYTE set = _set(
@@ -799,8 +755,6 @@ UINT CPU::set_u3_r8() {
     );
 
     registers.write_8(r8, u3);
-
-    PC += 1;
 
     // 8 T Cycles
     return 8;
@@ -821,8 +775,6 @@ UINT CPU::set_u3_mHL() {
 
     mmu.write(hl, set);
 
-    PC += 1;
-
     // 16 T Cycles
     return 16;
 }
@@ -830,15 +782,13 @@ UINT CPU::set_u3_mHL() {
 UINT CPU::swap_r8() {
     // Z000
 
-    UINT r8 = opcode & 0x07;
+    UINT r8 = _register_8(opcode & 0x07);
 
     BYTE s = _swap(
         registers.read_8(r8)
     );
     
     registers.write_8(r8, s);
-
-    PC += 1;
 
     // 8 T Cycles
     return 8;
@@ -856,8 +806,6 @@ UINT CPU::swap_mHL() {
     );
 
     mmu.write(hl, s);
-
-    PC += 1;
 
     // 16 T Cycles
     return 16;
@@ -953,7 +901,7 @@ BYTE CPU::_sr(BYTE b, bool arithmetic) {
 UINT CPU::rl_r8() {
     // Z00C
 
-    UINT r8 = opcode & 0x07;
+    UINT r8 = _register_8(opcode & 0x07);
 
     BYTE rl = _rl(
         registers.read_8(r8),
@@ -961,8 +909,6 @@ UINT CPU::rl_r8() {
     );
 
     registers.write_8(r8, rl);
-
-    PC += 1;
 
     // 8 T Cycles
     return 8;
@@ -982,8 +928,6 @@ UINT CPU::rl_mHL() {
 
     mmu.write(hl, rl);
 
-    PC += 1;
-
     // 16 T Cycles
     return 16;
 }
@@ -999,8 +943,6 @@ UINT CPU::rla() {
 
     registers.write_8(A, rl);
 
-    PC += 1;
-
     // 4 T Cycles
     return 4;
 }
@@ -1008,7 +950,7 @@ UINT CPU::rla() {
 UINT CPU::rlc_r8() {
     // Z00C
 
-    UINT r8 = opcode & 0x07;
+    UINT r8 = _register_8(opcode & 0x07);
 
     BYTE rl = _rl(
         registers.read_8(r8),
@@ -1016,8 +958,6 @@ UINT CPU::rlc_r8() {
     );
 
     registers.write_8(r8, rl);
-
-    PC += 1;
 
     // 8 T Cycles
     return 8;
@@ -1037,8 +977,6 @@ UINT CPU::rlc_mHL() {
 
     mmu.write(hl, rl);
 
-    PC += 1;
-
     // 16 T Cycles
     return 16;
 }
@@ -1055,8 +993,6 @@ UINT CPU::rlca() {
 
     registers.write_8(A, rl);
 
-    PC += 1;
-
     // 4 T Cycles
     return 4;
 }
@@ -1064,7 +1000,7 @@ UINT CPU::rlca() {
 UINT CPU::rr_r8() {
     // Z00C
 
-    UINT r8 = opcode & 0x07;
+    UINT r8 = _register_8(opcode & 0x07);
 
     BYTE rr = _rr(
         registers.read_8(r8),
@@ -1072,8 +1008,6 @@ UINT CPU::rr_r8() {
     );
 
     registers.write_8(r8, rr);
-
-    PC += 1;
 
     // 8 T Cycles
     return 8;
@@ -1093,8 +1027,6 @@ UINT CPU::rr_mHL() {
 
     mmu.write(hl, rr);
 
-    PC += 1;
-
     // 16 T Cycles
     return 16;
 }
@@ -1111,8 +1043,6 @@ UINT CPU::rra() {
 
     registers.write_8(A, rr);
 
-    PC += 1;
-
     // 4 T Cycles
     return 4;
 }
@@ -1120,7 +1050,7 @@ UINT CPU::rra() {
 UINT CPU::rrc_r8() {
     // Z00C
 
-    UINT r8 = opcode & 0x07;
+    UINT r8 = _register_8(opcode & 0x07);
 
     BYTE rr = _rr(
         registers.read_8(r8),
@@ -1128,8 +1058,6 @@ UINT CPU::rrc_r8() {
     );
 
     registers.write_8(r8, rr);
-
-    PC += 1;
 
     // 8 T Cycles
     return 8;
@@ -1149,8 +1077,6 @@ UINT CPU::rrc_mHL() {
 
     mmu.write(hl, rr);
 
-    PC += 1;
-
     // 16 T Cycles
     return 16;
 }
@@ -1165,8 +1091,6 @@ UINT CPU::rrca() {
 
     registers.write_8(A, rr);
 
-    PC += 1;
-
     // 4 T Cycles
     return 4;
 }
@@ -1174,7 +1098,7 @@ UINT CPU::rrca() {
 UINT CPU::sla_r8() {
     // Z00C
     
-    UINT r8 = opcode & 0x07;
+    UINT r8 = _register_8(opcode & 0x07);
 
     BYTE sl = _sl(
         registers.read_8(r8)
@@ -1184,8 +1108,6 @@ UINT CPU::sla_r8() {
         r8,
         sl
     );
-
-    PC += 1;
 
     // 8 T Cycles
     return 8;
@@ -1204,8 +1126,6 @@ UINT CPU::sla_mHL() {
 
     mmu.write(hl, sl);
 
-    PC += 1;
-
     // 16 T Cycles
     return 16;
 }
@@ -1213,7 +1133,7 @@ UINT CPU::sla_mHL() {
 UINT CPU::sra_r8() {
     // Z00C
     
-    UINT r8 = opcode & 0x07;
+    UINT r8 = _register_8(opcode & 0x07);
 
     BYTE sr = _sr(
         registers.read_8(r8),
@@ -1224,8 +1144,6 @@ UINT CPU::sra_r8() {
         r8,
         sr
     );
-
-    PC += 1;
 
     // 8 T Cycles
     return 8;
@@ -1245,8 +1163,6 @@ UINT CPU::sra_mHL() {
 
     mmu.write(hl, sr);
 
-    PC += 1;
-
     // 16 T Cycles
     return 16;
 }
@@ -1254,7 +1170,7 @@ UINT CPU::sra_mHL() {
 UINT CPU::srl_r8() {
     // Z00C
     
-    UINT r8 = opcode & 0x07;
+    UINT r8 = _register_8(opcode & 0x07);
 
     BYTE sr = _sr(
         registers.read_8(r8),
@@ -1265,8 +1181,6 @@ UINT CPU::srl_r8() {
         r8,
         sr
     );
-
-    PC += 1;
 
     // 8 T Cycles
     return 8;
@@ -1286,8 +1200,6 @@ UINT CPU::srl_mHL() {
 
     mmu.write(hl, sr);
 
-    PC += 1;
-
     // 16 T Cycles
     return 16;
 }
@@ -1303,8 +1215,6 @@ UINT CPU::ld_r8_r8(){
         registers.read_8(b_r8)
     );
 
-    PC += 1;
-
     // 4 T Cycles
     return 4;
 }
@@ -1312,14 +1222,14 @@ UINT CPU::ld_r8_r8(){
 UINT CPU::ld_r8_n8(){
 
     UINT r8 = (opcode >> 3u) & 0x07;
-    BYTE n8 = mmu.read(PC + 1);
+    BYTE n8 = mmu.read(PC);
 
     registers.write_8(
         r8,
         n8
     );
 
-    PC += 2;
+    PC += 1;
 
     // 8 T Cycles
     return 8;
@@ -1329,8 +1239,8 @@ UINT CPU::ld_r16_n16(){
 
     UINT r16 = (opcode >> 4u) & 0x03;
     WORD n16 = concat(
-        mmu.read(PC + 2),
-        mmu.read(PC + 1)
+        mmu.read(PC + 1),
+        mmu.read(PC)
     );
 
     registers.write_16(
@@ -1338,7 +1248,7 @@ UINT CPU::ld_r16_n16(){
         n16
     );
 
-    PC += 3;
+    PC += 2;
 
     // 12 T Cycles
     return 12;
@@ -1348,14 +1258,12 @@ UINT CPU::ld_mHL_r8(){
 
     WORD hl = registers.read_16(HL);
 
-    UINT r8 = opcode & 0x07;
+    UINT r8 = _register_8(opcode & 0x07);
     
     mmu.write(
         hl,
         registers.read_8(r8)
     );
-
-    PC += 1;
 
     // 8 T Cycles
     return 8;
@@ -1365,14 +1273,14 @@ UINT CPU::ld_mHL_n8(){
 
     WORD hl = registers.read_16(HL);
 
-    BYTE n8 = mmu.read(PC + 1);
+    BYTE n8 = mmu.read(PC);
 
     mmu.write(
         hl,
         n8
     );
 
-    PC += 2;
+    PC += 1;
 
     // 12 T Cycles
     return 12;
@@ -1384,11 +1292,9 @@ UINT CPU::ld_r8_mHL(){
 
     BYTE mHL = mmu.read(hl);
 
-    UINT r8 = opcode & 0x07;
+    UINT r8 = _register_8(opcode & 0x07);
 
     registers.write_8(r8, mHL);
-
-    PC += 1;
 
     // 8 T Cycles
     return 8;
@@ -1402,8 +1308,6 @@ UINT CPU::ld_mr16_A(){
         registers.read_16(r16),
         registers.read_8(A)
     );
-
-    PC += 1;
     
     // 8 T Cycles
     return 8;
@@ -1412,8 +1316,8 @@ UINT CPU::ld_mr16_A(){
 UINT CPU::ld_mn16_A(){
 
     WORD n16 = concat(
-        mmu.read(PC + 2),
-        mmu.read(PC + 1)
+        mmu.read(PC + 1),
+        mmu.read(PC)
     );
 
     mmu.write(
@@ -1421,7 +1325,7 @@ UINT CPU::ld_mn16_A(){
         registers.read_8(A)
     );
 
-    PC += 3;
+    PC += 2;
 
     // 16 T Cycles
     return 16;
@@ -1429,14 +1333,14 @@ UINT CPU::ld_mn16_A(){
 
 UINT CPU::ldh_mn16_A(){
 
-    BYTE n8 = mmu.read(PC + 1);
+    BYTE n8 = mmu.read(PC);
 
     mmu.write(
         0xFF00 + n8,
         registers.read_8(A)
     );
 
-    PC += 2;
+    PC += 1;
 
     // 12 T Cycles
     return 12;
@@ -1448,8 +1352,6 @@ UINT CPU::ldh_mC_A(){
         0xFF00 + registers.read_8(C),
         registers.read_8(A)    
     );
-
-    PC += 1;
 
     // 8 T Cycles
     return 8;
@@ -1464,8 +1366,6 @@ UINT CPU::ld_A_mr16(){
         mmu.read(registers.read_16(r16))
     );
 
-    PC += 1;
-
     // 8 T Cycles
     return 8;
 }
@@ -1473,8 +1373,8 @@ UINT CPU::ld_A_mr16(){
 UINT CPU::ld_A_mn16(){
 
     WORD n16 = concat(
-        mmu.read(PC + 2),
-        mmu.read(PC + 1)
+        mmu.read(PC + 1),
+        mmu.read(PC)
     );
 
     registers.write_8(
@@ -1482,7 +1382,7 @@ UINT CPU::ld_A_mn16(){
         mmu.read(n16)
     );
 
-    PC += 3;
+    PC += 2;
 
     // 16 T Cycles
     return 16;
@@ -1490,14 +1390,14 @@ UINT CPU::ld_A_mn16(){
 
 UINT CPU::ldh_A_mn16(){
 
-    BYTE n8 = mmu.read(PC + 1);
+    BYTE n8 = mmu.read(PC);
 
     registers.write_8(
         A,
         mmu.read(0xFF00 + n8)
     );
 
-    PC += 2;
+    PC += 1;
 
     // 12 T Cycles
     return 12;
@@ -1509,8 +1409,6 @@ UINT CPU::ldh_A_mC(){
         A,
         mmu.read(0xFF00 + registers.read_8(C))
     );
-
-    PC += 1;
 
     // 8 T Cycles
     return 8;
@@ -1527,8 +1425,6 @@ UINT CPU::ld_mHLI_A(){
 
     registers.write_16(HL, hl + 1);
 
-    PC += 1;
-
     // 8 T Cycles
     return 8;
 }
@@ -1543,8 +1439,6 @@ UINT CPU::ld_mHLD_A(){
     );
 
     registers.write_16(HL, hl - 1);
-
-    PC += 1;
 
     // 8 T Cycles
     return 8;
@@ -1561,8 +1455,6 @@ UINT CPU::ld_A_mHLI(){
 
     registers.write_16(HL, hl + 1);
 
-    PC += 1;
-
     // 8 T Cycles
     return 8;
 }
@@ -1578,30 +1470,43 @@ UINT CPU::ld_A_mHLD(){
 
     registers.write_16(HL, hl - 1);
 
-    PC += 1;
-
     // 8 T Cycles
     return 8;
 }
 
 // Jump and Subroutines
+bool CPU::_condition(UINT c) {
+    switch(c) {
+        case 0:
+            return !registers.get_z_flag();
+        case 1:
+            return registers.get_z_flag();
+        case 2:
+            return !registers.get_c_flag();
+        case 3:
+            return registers.get_c_flag();
+    }
+    throw "Unknown condition";
+}
+
+void CPU::_call(WORD address) {
+    mmu.write(SP - 1, lsb(PC));
+
+    mmu.write(SP - 2, msb(PC));
+
+    SP -= 2;
+
+    PC = address;
+}
+
 UINT CPU::call_n16() {
 
     WORD n16 = concat(
-        mmu.read(PC + 2),
-        mmu.read(PC + 1)
+        mmu.read(PC + 1),
+        mmu.read(PC)
     );
 
-    mmu.write(SP, lsb(PC + 3));
-
-    SP += 1;
-
-    mmu.write(SP, msb(PC + 3));
-
-    SP += 1;
-
-    // jump to n16
-    PC = n16;
+    _call(n16);
 
     // 24 T Cycles
     return 24;
@@ -1609,29 +1514,20 @@ UINT CPU::call_n16() {
 
 UINT CPU::call_cc_n16() {
     WORD n16 = concat(
-        mmu.read(PC + 2),
-        mmu.read(PC + 1)
+        mmu.read(PC + 1),
+        mmu.read(PC)
     );
 
-    bool cc;
+    bool cc = _condition( (opcode >> 3u) & 0x03 );
 
     if(cc) {
-        mmu.write(SP, lsb(PC + 3));
-
-        SP += 1;
-
-        mmu.write(SP, msb(PC + 3));
-
-        SP += 1;
-
-        // jump to n16
-        PC = n16;
+        _call(n16);
 
         // 24 T Cycles
         return 24;
     }
 
-    PC += 3;
+    PC += 2;
 
     // 12 T Cycles
     return 12;
@@ -1648,8 +1544,8 @@ UINT CPU::jp_HL() {
 UINT CPU::jp_n16() {
 
     WORD n16 = concat(
-        mmu.read(PC + 2),
-        mmu.read(PC + 1)
+        mmu.read(PC + 1),
+        mmu.read(PC)
     );
 
     PC = n16;
@@ -1661,20 +1557,20 @@ UINT CPU::jp_n16() {
 UINT CPU::jp_cc_n16() {
 
     WORD n16 = concat(
-        mmu.read(PC + 2),
-        mmu.read(PC + 1)
+        mmu.read(PC + 1),
+        mmu.read(PC)
     );
 
-    bool c;
-    // FIXME research more
-    if(c) {
+    bool cc = _condition( (opcode >> 3u) & 0x03 );
+
+    if(cc) {
         PC = n16;
 
         // 16 T Cycles
         return 16;
     }
 
-    PC += 3;
+    PC += 2;
 
     // 12 T Cycles
     return 12;
@@ -1682,10 +1578,10 @@ UINT CPU::jp_cc_n16() {
 
 UINT CPU::jr_n16() {
 
-    SIGNED_BYTE n8 = mmu.read(PC + 1);
+    SIGNED_BYTE n8 = mmu.read(PC);
 
     // FIXME signed and unsigend arithmetic?
-    PC += 
+    PC += n8 + 2;
 
     // 12 T Cycles
     return 12;
@@ -1693,32 +1589,89 @@ UINT CPU::jr_n16() {
 
 UINT CPU::jr_cc_n16() {
 
+    SIGNED_BYTE n8 = mmu.read(PC);
+
+    bool c;
+    // FIXME handle c flag
+    if(c) {
+        // FIXME signed and unsigend arithmetic?
+        PC += n8 + 2;
+
+        // 8 T Cycles
+        return 8;
+    }
+
+    PC += 1;
+
+    // 12 T Cycles
+    return 12;
+}
+
+UINT CPU::ret() {
+    
+    WORD p = concat(
+        mmu.read(SP + 1),
+        mmu.read(SP)
+    );
+
+    SP += 2;
+
+    PC = p;
+
+    // 16 T Cycles
+    return 16;
 }
 
 UINT CPU::ret_cc() {
 
-}
+    bool cc = _condition( (opcode >> 3u) & 0x03 );
 
-UINT CPU::ret() {
+    if(cc) {
+        ret();
 
+        // 20 T Cycles
+        return 20;
+    }
+
+    // 8 T Cycles
+    return 8;
 }
 
 UINT CPU::reti() {
+    // FIXME set IME
 
+    ret();
+
+    // 16 T Cycles
+    return 16;
 }
 
 UINT CPU::rst() {
 
-}
+    WORD vec = opcode & 0b00111000;
 
+    mmu.write(SP - 1, lsb(PC + 1));
+
+    mmu.write(SP - 2, msb(PC + 1));
+
+    SP -= 2;
+
+    PC = vec;
+
+    // 16 T Cycles
+    return 16;
+}
 
 // Stack Operations Instructions
 UINT CPU::add_HL_sp() {
+    // -0HC
 
-    registers.write_16(
-        HL,
-        registers.read_16(HL) + SP
+    WORD sum = _add_16(
+        registers.read_16(HL),
+        SP
     );
+
+    registers.write_16(HL, sum);
 
     // 8 T Cycles
     return 8;
@@ -1726,11 +1679,14 @@ UINT CPU::add_HL_sp() {
 
 UINT CPU::add_SP_e8() {
 
-    int e8;
+    SIGNED_BYTE e8 = mmu.read(PC);
 
-    WORD sum = _add_8(e8, SP);
+    // Set flags
+    _add_8((BYTE) SP, e8, false);
 
-    SP = sum;
+    SP += e8;
+
+    PC += 1;
 
     // 16 T Cycles
     return 16;
@@ -1755,11 +1711,13 @@ UINT CPU::inc_SP() {
 UINT CPU::ld_SP_n16() {
 
     WORD n16 = concat(
-        mmu.read(PC + 2),
-        mmu.read(PC + 1)
+        mmu.read(PC + 1),
+        mmu.read(PC)
     );
 
     SP = n16;
+
+    PC += 2;
 
     // 12 T Cycles
     return 12;
@@ -1768,12 +1726,14 @@ UINT CPU::ld_SP_n16() {
 UINT CPU::ld_mn16_SP() {
 
     WORD n16 = concat(
-        mmu.read(PC + 2),
-        mmu.read(PC + 1)
+        mmu.read(PC + 1),
+        mmu.read(PC)
     );
 
     mmu.write(n16, (BYTE) (SP & 0xFF));
     mmu.write(n16 + 1, (BYTE) (SP >> 8u));
+
+    PC += 2;
 
     // 20 T Cycles
     return 20;
@@ -1782,13 +1742,18 @@ UINT CPU::ld_mn16_SP() {
 UINT CPU::ld_HL_SPe8() {
     // 00HC
 
-    int e8;
-    // FIXME handle signed arithmetic
+    SIGNED_BYTE e8 = mmu.read(PC);
+    
+    // set right flags
+    _add_8((BYTE) SP, e8, false);
+
     registers.write_16(
         HL,
         SP + e8
     );
     
+    PC += 1;
+
     // 12 T Cycles
     return 12;
 }
@@ -1878,6 +1843,10 @@ UINT CPU::push_r16() {
 UINT CPU::ccf() {
     // -00C
 
+    registers.set_n_flag(0);
+
+    registers.set_h_flag(0);
+
     registers.set_c_flag(
         !registers.get_c_flag()
     );
@@ -1894,6 +1863,10 @@ UINT CPU::cpl() {
         ~registers.read_8(A)
     );
 
+    registers.set_n_flag(1);
+
+    registers.set_h_flag(1);
+
     // 4 T Cycles
     return 4;
 }
@@ -1903,13 +1876,40 @@ UINT CPU::daa() {
 
     // FIXME decimal adjust accumulator ??
 
+    BYTE a = registers.read_8(A);
+
+    bool n = registers.get_n_flag(),
+         h = registers.get_h_flag(),
+         c = registers.get_c_flag();
+
+    if(n) {
+        if(c) {
+            a -= 0x60;
+        } 
+        if(h) {
+            a -= 0x06;
+        }
+    } else {
+        if(c || a > 0x99) {
+            a += 0x60;
+            registers.set_c_flag(1);
+        }
+        if(h || (a & 0x0F) > 0x09) {
+            a += 0x06;
+        }
+    }
+
+    registers.set_z_flag(a == 0);
+
+    registers.set_h_flag(0);
+
     // 4 T Cycles
     return 4;
 }
 
 UINT CPU::di() {
 
-    // FIXME clear IME flag
+    IME = 0;
 
     // 4 T Cycles
     return 4;
@@ -1917,17 +1917,19 @@ UINT CPU::di() {
 
 UINT CPU::ei() {
 
-    // FIXME set IME flag
-    // flag set only after the instruction following EI
+    // Exec next instr    // FIXME decode and exec
 
-    // 4 T Cycles
+    IME = 1;
+
+    // 4 T Cycles FIXME add next instr cycles
     return 4;
 }
 
 UINT CPU::halt() {
-
-
-    // ??
+    halt_mode = true;
+    
+    // Wait for interrupt
+    return 0;
 }
 
 UINT CPU::nop() {
@@ -1940,10 +1942,19 @@ UINT CPU::nop() {
 UINT CPU::scf() {
     // -001
 
+    registers.set_n_flag(0);
+
+    registers.set_h_flag(0);
+
+    registers.set_c_flag(1);
+
     // 4 T Cycles
     return 4;
 }
 
 UINT CPU::stop() {
-    // ??
+    sleep_mode = true;
+    
+    // Wait for interrupt or joypad
+    return 0;
 }
