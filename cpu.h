@@ -1,3 +1,8 @@
+#ifndef CPU_H
+#define CPU_H
+
+#include <unordered_map>
+
 #include "constants.h"
 #include "helpers.h"
 #include "mmu.h"
@@ -16,14 +21,30 @@
 #define DE 4
 #define HL 6
 
+
 class CPU {
 public:
-    UINT run_fde();
+    CPU(MMU &mmu) : mmu(mmu) {
+        halt_mode = false;
+        sleep_mode = false;
+        IME = true;
+        EI = true;
+
+        SP = 0xFFFE;
+        PC = 0;
+
+        init_instr_tables();
+    }
+
+    UINT run_fde(bool);
+
+    typedef UINT (CPU::*cpu_instr)();
 
     // CPU states
     bool halt_mode;
     bool sleep_mode;
     bool IME;
+    bool EI;
 
 // private:
     class Registers {
@@ -133,12 +154,19 @@ public:
     WORD PC;
     BYTE opcode;
     Registers registers;
-    MMU &mmu;
+    MMU mmu;
+
+    std::unordered_map<BYTE, cpu_instr> instr;
+    std::unordered_map<BYTE, cpu_instr> cb_instr;
+
+    void init_instr_tables();
 
     /*
         Instruction Reference: 
             https://rgbds.gbdev.io/docs/v0.6.1/gbz80.7/
     */
+    // Prefix
+    UINT prefix_cb();
 
     // 8 bit Arithmetic and Logic Instructions
     BYTE _add_8(BYTE, BYTE, bool);
@@ -285,7 +313,7 @@ public:
     UINT rst();
 
     // Stack Operations Instructions
-    UINT add_HL_sp();
+    UINT add_HL_SP();
     UINT add_SP_e8();
     UINT dec_SP();
     UINT inc_SP();
@@ -309,3 +337,5 @@ public:
     UINT scf();
     UINT stop();
 };
+
+#endif

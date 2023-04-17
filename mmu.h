@@ -1,12 +1,32 @@
+#ifndef MMU_H
+#define MMU_H
+
 #include "constants.h"
 
 #define MEMORY_BYTES 0x10000
 
 class MMU {
 public:
+    MMU() : ref_count(new int(1)) { M = new BYTE[MEMORY_BYTES]; }
+
+    MMU(MMU &rhs) : M(rhs.M), ref_count(rhs.ref_count) {
+        *ref_count += 1;
+    }
+
+    ~MMU() { 
+        if(--(*ref_count) == 0) {
+            delete ref_count;
+            delete[] M;
+        }
+    }
+
+    int *ref_count;
 
     void write(WORD address, BYTE b) { M[address] = b; }
     BYTE read(WORD address) { return M[address]; }
+
+    void read_rom(const char file[]);
+    void print_rom();
 
 private:
     /*
@@ -23,7 +43,9 @@ private:
         0xFF80 - 0xFFFE HRAM
         0xFFFF Interrupt Enable register
     */
-    WORD M[MEMORY_BYTES];
+    BYTE *M;
 
 
 };
+
+#endif
