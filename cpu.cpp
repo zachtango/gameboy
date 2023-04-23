@@ -4,9 +4,10 @@
 #include <iostream>
 #include <iomanip>
 
+#include <execinfo.h>
+
 void CPU::init_instr_tables() {
-    std::cout << __func__ << '\n';
-    
+
     instr[0x00] = &CPU::nop;
     instr[0x01] = &CPU::ld_r16_n16;
     instr[0x02] = &CPU::ld_mr16_A;
@@ -49,7 +50,7 @@ void CPU::init_instr_tables() {
     instr[0x25] = &CPU::dec_r8;
     instr[0x26] = &CPU::ld_r8_n8;
     instr[0x27] = &CPU::daa;
-    instr[0x28] = &CPU::jr_n16;
+    instr[0x28] = &CPU::jr_cc_n16;
     instr[0x29] = &CPU::add_HL_r16;
     instr[0x2A] = &CPU::ld_A_mHLI;
     instr[0x2B] = &CPU::dec_r16;
@@ -66,7 +67,7 @@ void CPU::init_instr_tables() {
     instr[0x35] = &CPU::dec_mHL;
     instr[0x36] = &CPU::ld_mHL_n8;
     instr[0x37] = &CPU::scf;
-    instr[0x38] = &CPU::jr_n16;
+    instr[0x38] = &CPU::jr_cc_n16;
     instr[0x39] = &CPU::add_HL_SP;
     instr[0x3A] = &CPU::ld_A_mHLD;
     instr[0x3B] = &CPU::dec_SP;
@@ -222,7 +223,7 @@ void CPU::init_instr_tables() {
     instr[0xC8] = &CPU::ret_cc;
     instr[0xC9] = &CPU::ret;
     instr[0xCA] = &CPU::jp_cc_n16;
-    instr[0xCB] = &CPU::prefix_cb;
+    instr[0xCB] = &CPU::cb_prefix;
     instr[0xCC] = &CPU::call_cc_n16;
     instr[0xCD] = &CPU::call_n16;
     instr[0xCE] = &CPU::adc_A_n8;
@@ -286,7 +287,7 @@ void CPU::init_instr_tables() {
     cb_instr[0x04] = &CPU::rlc_r8;
     cb_instr[0x05] = &CPU::rlc_r8;
     cb_instr[0x06] = &CPU::rlc_mHL;
-    cb_instr[0x07] = &CPU::rrc_r8;
+    cb_instr[0x07] = &CPU::rlc_r8;
     cb_instr[0x08] = &CPU::rrc_r8;
     cb_instr[0x09] = &CPU::rrc_r8;
     cb_instr[0x0A] = &CPU::rrc_r8;
@@ -553,23 +554,82 @@ void CPU::init_instr_tables() {
 }
 
 /*
+    Handle interrupts
+*/
+void CPU::handle_interrupts() {
+    // Reset IF bit of interrupt and IME flag
+
+    /*
+        call address of corresponding interrupt
+        
+    */
+
+
+}
+
+
+/*
+    Debug helper functions
+*/
+void CPU::print_registers() {
+    out << std::hex << std::uppercase <<
+        "$" << std::setw(4) << std::setfill('0') << (int) PC << ' ' <<
+        "A:" << std::setw(2) << std::setfill('0') << (int)(registers.read_8(A)) << ' ' <<
+        "F:" << std::setw(2) << std::setfill('0') << (int)(registers.read_8(F)) << ' ' <<
+        "B:" << std::setw(2) << std::setfill('0') << (int)(registers.read_8(B)) << ' ' <<
+        "C:" << std::setw(2) << std::setfill('0') << (int)(registers.read_8(C)) << ' ' <<
+        "D:" << std::setw(2) << std::setfill('0') << (int)(registers.read_8(D)) << ' ' <<
+        "E:" << std::setw(2) << std::setfill('0') << (int)(registers.read_8(E)) << ' ' <<
+        "H:" << std::setw(2) << std::setfill('0') << (int)(registers.read_8(H)) << ' ' <<
+        "L:" << std::setw(2) << std::setfill('0') << (int)(registers.read_8(L)) << ' ' <<
+        "SP:" << std::setw(4) << std::setfill('0') << (int) (SP) << ' ' <<
+        "PC:" << std::setw(4) << std::setfill('0') << (int) (PC) << ' ' <<
+        "PCMEM:" << std::setw(2) << std::setfill('0') << (int) mmu.read(PC) << ','
+                << std::setw(2) << std::setfill('0') << (int) mmu.read(PC + 1) << ','
+                << std::setw(2) << std::setfill('0') << (int) mmu.read(PC + 2) << ','
+                << std::setw(2) << std::setfill('0') << (int) mmu.read(PC + 3) << '\n';
+    out.flush();
+}
+
+char out_r8(UINT r8) {
+    char c[] = {'A', 'F', 'B', 'C', 'D', 'E', 'H', 'L'};
+    return c[r8];
+}
+
+char* out_r16(UINT r16) {
+    char *c[7] = {"AF", "", "BC", "", "DE", "", "HL"};
+    
+    return c[r16];
+}
+
+/*
     Instructions
 */
 
-UINT CPU::run_fde(bool prefix) {
-
+UINT CPU::run_fde() {
+    
     // fetch
     opcode = mmu.read(PC);    
-    std::cout << PC << ' '
-        << std::hex << std::setw(2)
-        << std::setfill('0') << static_cast<int>(opcode) << '\n';
+    // std::cout << std::hex << PC << ' '
+    //     << std::setw(2)
+    //     << std::setfill('0') << static_cast<int>(opcode) << '\n';
     
+    if(!prefix)
+        print_registers();
+    
+    prev = PC;
     PC += 1;
 
     // decode
     cpu_instr f;
-    if(prefix) f = cb_instr[opcode];
-    else f = instr[opcode];
+
+    bool reset_prefix = false;
+    if(prefix) {
+        f = cb_instr[opcode];
+        reset_prefix = true;
+    } else f = instr[opcode];
+
+    // backtrace_symbols_fd((void*const*) &f, 1, 1);
 
     UINT cycles;
 
@@ -583,14 +643,16 @@ UINT CPU::run_fde(bool prefix) {
         // might seem redundant but function might set EI
         // FIXME, maybe there's a better way to dot his
     }
+    
+    if(reset_prefix) prefix = false;
 
     return cycles;
 }
 
 // Prefix
-UINT CPU::prefix_cb() {
-    std::cout << __func__ << '\n';
-    return 4 + run_fde(true);
+UINT CPU::cb_prefix() {
+    prefix = true;
+    return 4;
 }
 
 // 8 bit Arithmetic and Logic Instructions
@@ -714,6 +776,7 @@ void CPU::_add_A_r8(bool carry) {
     // Z0HC
 
     UINT r8 = _register_8(opcode & 0x07);
+    // std::cout << out_r8(r8) << '\n';
 
     BYTE sum = _add_8(
         registers.read_8(A),
@@ -744,6 +807,7 @@ void CPU::_add_A_n8(bool carry) {
     // Z0HC
 
     BYTE n8 = mmu.read(PC);
+    // std::cout << std::hex << (int) n8 << '\n';
 
     BYTE sum = _add_8(
         registers.read_8(A),
@@ -803,7 +867,7 @@ void CPU::_sub_A_n8(bool carry) {
 }
 
 UINT CPU::adc_A_r8() {
-    std::cout << __func__ << '\n';
+
     _add_A_r8(true);
     
     // 4 T Cycles
@@ -811,7 +875,7 @@ UINT CPU::adc_A_r8() {
 }
 
 UINT CPU::adc_A_mHL() {
-    std::cout << __func__ << '\n';
+
     _add_A_mHL(true);
 
     // 8 T Cycles
@@ -819,7 +883,7 @@ UINT CPU::adc_A_mHL() {
 }
 
 UINT CPU::adc_A_n8() {
-    std::cout << __func__ << '\n';
+
     _add_A_n8(true);
 
     // 8 T Cycles;
@@ -827,7 +891,7 @@ UINT CPU::adc_A_n8() {
 }
 
 UINT CPU::add_A_r8() {
-    std::cout << __func__ << '\n';
+
     _add_A_r8(false);
     
     // 4 T Cycles
@@ -835,7 +899,7 @@ UINT CPU::add_A_r8() {
 }
 
 UINT CPU::add_A_mHL() {
-    std::cout << __func__ << '\n';
+
     _add_A_mHL(false);
 
     // 8 T Cycles
@@ -843,7 +907,7 @@ UINT CPU::add_A_mHL() {
 }
 
 UINT CPU::add_A_n8() {
-    std::cout << __func__ << '\n';
+
     _add_A_n8(false);
 
     // 8 T Cycles;
@@ -851,7 +915,7 @@ UINT CPU::add_A_n8() {
 }
 
 UINT CPU::and_A_r8() {
-    std::cout << __func__ << '\n';
+
     // Z010
 
     UINT r8 = _register_8(opcode & 0x07); // get r8 from opcode fIXME
@@ -868,7 +932,7 @@ UINT CPU::and_A_r8() {
 }
 
 UINT CPU::and_A_mHL() {
-    std::cout << __func__ << '\n'; 
+ 
     // Z010
 
     WORD hl = registers.read_16(HL);
@@ -887,7 +951,7 @@ UINT CPU::and_A_mHL() {
 }
 
 UINT CPU::and_A_n8() {
-    std::cout << __func__ << '\n';
+
     // Z010
 
     BYTE n8 = mmu.read(PC); // FIXME get n8 from opcode
@@ -906,7 +970,7 @@ UINT CPU::and_A_n8() {
 }
 
 UINT CPU::cp_A_r8() {
-    std::cout << __func__ << '\n';
+
     // Z1HC
 
     UINT r8 = _register_8(opcode & 0x07); // FIXME get r8 from opcode
@@ -922,7 +986,7 @@ UINT CPU::cp_A_r8() {
 }
 
 UINT CPU::cp_A_mHL() {
-    std::cout << __func__ << '\n';
+
     // Z1HC
 
     WORD hl = registers.read_16(HL);
@@ -940,7 +1004,7 @@ UINT CPU::cp_A_mHL() {
 }
 
 UINT CPU::cp_A_n8() {
-    std::cout << __func__ << '\n';
+
     // Z1HC
 
     BYTE n8 = mmu.read(PC); // FIXME get n8 from opcode
@@ -958,10 +1022,10 @@ UINT CPU::cp_A_n8() {
 }
 
 UINT CPU::dec_r8() {
-    std::cout << __func__ << '\n';
+
     // ZNH-
 
-    UINT r8 = _register_8(opcode & 0x07); // FIXME get r8 from opcode
+    UINT r8 = _register_8((opcode >> 3u) & 0x07); // FIXME get r8 from opcode
 
     BYTE dec = _dec(registers.read_8(r8));
 
@@ -972,7 +1036,7 @@ UINT CPU::dec_r8() {
 }
 
 UINT CPU::dec_mHL() {
-    std::cout << __func__ << '\n';
+
     // ZNH-
 
     WORD hl = registers.read_16(HL);
@@ -988,12 +1052,14 @@ UINT CPU::dec_mHL() {
 }
 
 UINT CPU::inc_r8() {
-    std::cout << __func__ << '\n';
+
     // Z0H-
 
-    UINT r8 = _register_8(opcode & 0x07); // FIXME get r8 from opcode
+    UINT r8 = _register_8((opcode >> 3u) & 0x07); // FIXME get r8 from opcode
 
     BYTE inc = _inc(registers.read_8(r8));
+
+    // std::cout << out_r8(r8) << " val: " << std::hex << (int) inc << '\n';
 
     registers.write_8(r8, inc);
 
@@ -1002,7 +1068,7 @@ UINT CPU::inc_r8() {
 }
 
 UINT CPU::inc_mHL() {
-    std::cout << __func__ << '\n';
+
     // Z0H-
 
     WORD hl = registers.read_16(HL);
@@ -1018,7 +1084,7 @@ UINT CPU::inc_mHL() {
 }
 
 UINT CPU::or_A_r8() {
-    std::cout << __func__ << '\n';
+
     // Z000
 
     UINT r8 = _register_8(opcode & 0x07); // FIXME get r8 from opcode
@@ -1035,7 +1101,7 @@ UINT CPU::or_A_r8() {
 }
 
 UINT CPU::or_A_mHL() {
-    std::cout << __func__ << '\n';
+
     // Z000
 
     WORD hl = registers.read_16(HL);
@@ -1054,7 +1120,7 @@ UINT CPU::or_A_mHL() {
 }
 
 UINT CPU::or_A_n8() {
-    std::cout << __func__ << '\n';
+
     // Z000
 
     BYTE n8 = mmu.read(PC); // FIXME get n8 from opcode
@@ -1073,7 +1139,7 @@ UINT CPU::or_A_n8() {
 }
 
 UINT CPU::sbc_A_r8() {
-    std::cout << __func__ << '\n';
+
     // Z1HC
 
     _sub_A_r8(true);
@@ -1083,7 +1149,7 @@ UINT CPU::sbc_A_r8() {
 }
 
 UINT CPU::sbc_A_mHL() {
-    std::cout << __func__ << '\n';
+
      // Z1HC
 
     _sub_A_mHL(true);
@@ -1093,7 +1159,7 @@ UINT CPU::sbc_A_mHL() {
 }
 
 UINT CPU::sbc_A_n8() {
-    std::cout << __func__ << '\n';
+
     // Z1HC
 
     _sub_A_n8(true);
@@ -1103,7 +1169,7 @@ UINT CPU::sbc_A_n8() {
 }
 
 UINT CPU::sub_A_r8() {
-    std::cout << __func__ << '\n';
+
     // Z1HC
 
     _sub_A_r8(false);
@@ -1113,7 +1179,7 @@ UINT CPU::sub_A_r8() {
 }
 
 UINT CPU::sub_A_mHL() {
-    std::cout << __func__ << '\n';
+
      // Z1HC
 
     _sub_A_mHL(false);
@@ -1123,7 +1189,7 @@ UINT CPU::sub_A_mHL() {
 }
 
 UINT CPU::sub_A_n8() {
-    std::cout << __func__ << '\n';
+
     // Z1HC
 
     _sub_A_n8(false);
@@ -1133,7 +1199,7 @@ UINT CPU::sub_A_n8() {
 }
 
 UINT CPU::xor_A_r8() {
-    std::cout << __func__ << '\n';
+
     // Z000
     
     UINT r8 = _register_8(opcode & 0x07); // FIXME r8
@@ -1150,7 +1216,7 @@ UINT CPU::xor_A_r8() {
 }
 
 UINT CPU::xor_A_mHL() {
-    std::cout << __func__ << '\n';
+
     // Z000
 
     WORD hl = registers.read_16(HL);
@@ -1169,7 +1235,7 @@ UINT CPU::xor_A_mHL() {
 }
 
 UINT CPU::xor_A_n8() {
-    std::cout << __func__ << '\n';
+
     // Z000
 
     BYTE n8 = mmu.read(PC); // FIXME read n8 from opcode
@@ -1201,7 +1267,7 @@ WORD CPU::_add_16(WORD a, WORD b) {
 }
 
 UINT CPU::add_HL_r16() {
-    std::cout << __func__ << '\n';
+
     // -0HC
 
     UINT r16 = _register_16( (opcode >> 4u) & 0x03 ); // FIXME get r16 from opcode
@@ -1218,7 +1284,7 @@ UINT CPU::add_HL_r16() {
 }
 
 UINT CPU::dec_r16() {
-    std::cout << __func__ << '\n';
+
     
     UINT r16 = _register_16( (opcode >> 4u) & 0x03 ); // FIXME get r16 from opcode
 
@@ -1231,7 +1297,7 @@ UINT CPU::dec_r16() {
 }
 
 UINT CPU::inc_r16() {
-    std::cout << __func__ << '\n';
+
 
     UINT r16 = _register_16( (opcode >> 4u) & 0x03 ); // FIXME get r16 from opcode
 
@@ -1247,7 +1313,7 @@ UINT CPU::inc_r16() {
 void CPU::_bit(BYTE b, UINT n) {
     // Z01-
 
-    registers.set_z_flag( (b >> n) & 0x01 );
+    registers.set_z_flag( ((b >> n) & 0x01) == 0 );
 
     registers.set_n_flag(0);
 
@@ -1280,12 +1346,15 @@ BYTE CPU::_swap(BYTE b) {
 }
 
 UINT CPU::bit_u3_r8() {
-    std::cout << __func__ << '\n';
+
     // Z01-
 
     UINT r8 = _register_8(opcode & 0x07); // GET r8 from opcode
     UINT u3 = (opcode >> 3u) & 0x07; // GET u3 from opcode
 
+    // std::cout << "r8: " << r8 << '\n' <<
+                // "u3: " << u3 << '\n';
+    
     _bit(
         registers.read_8(r8),
         u3
@@ -1296,7 +1365,7 @@ UINT CPU::bit_u3_r8() {
 }
 
 UINT CPU::bit_u3_mHL() {
-    std::cout << __func__ << '\n';
+
     // Z01-
 
     WORD hl = registers.read_16(HL);
@@ -1315,7 +1384,7 @@ UINT CPU::bit_u3_mHL() {
 }
 
 UINT CPU::res_u3_r8() {
-    std::cout << __func__ << '\n';
+
     
     UINT r8 = _register_8(opcode & 0x07);
     UINT u3 = (opcode >> 3u) & 0x07;
@@ -1332,7 +1401,7 @@ UINT CPU::res_u3_r8() {
 }
 
 UINT CPU::res_u3_mHL() {
-    std::cout << __func__ << '\n';
+
 
     WORD hl = registers.read_16(HL);
 
@@ -1352,7 +1421,7 @@ UINT CPU::res_u3_mHL() {
 }
 
 UINT CPU::set_u3_r8() {
-    std::cout << __func__ << '\n';
+
 
     UINT r8 = _register_8(opcode & 0x07);
     UINT u3 = (opcode >> 3u) & 0x07;
@@ -1362,14 +1431,14 @@ UINT CPU::set_u3_r8() {
         u3
     );
 
-    registers.write_8(r8, u3);
+    registers.write_8(r8, set);
 
     // 8 T Cycles
     return 8;
 }
 
 UINT CPU::set_u3_mHL() {
-    std::cout << __func__ << '\n';
+
 
     WORD hl = registers.read_16(HL);
 
@@ -1389,7 +1458,7 @@ UINT CPU::set_u3_mHL() {
 }
 
 UINT CPU::swap_r8() {
-    std::cout << __func__ << '\n';
+
     // Z000
 
     UINT r8 = _register_8(opcode & 0x07);
@@ -1405,7 +1474,7 @@ UINT CPU::swap_r8() {
 }
 
 UINT CPU::swap_mHL() {
-    std::cout << __func__ << '\n';
+
     // Z000
 
     WORD hl = registers.read_16(HL);
@@ -1510,7 +1579,7 @@ BYTE CPU::_sr(BYTE b, bool arithmetic) {
 }
 
 UINT CPU::rl_r8() {
-    std::cout << __func__ << '\n';
+
     // Z00C
 
     UINT r8 = _register_8(opcode & 0x07);
@@ -1527,7 +1596,7 @@ UINT CPU::rl_r8() {
 }
 
 UINT CPU::rl_mHL() {
-    std::cout << __func__ << '\n';
+
     // Z00C
 
     WORD hl = registers.read_16(HL);
@@ -1546,7 +1615,7 @@ UINT CPU::rl_mHL() {
 }
 
 UINT CPU::rla() {
-    std::cout << __func__ << '\n';
+
     // 000C
 
     BYTE rl = _rl(
@@ -1563,7 +1632,7 @@ UINT CPU::rla() {
 }
 
 UINT CPU::rlc_r8() {
-    std::cout << __func__ << '\n';
+
     // Z00C
 
     UINT r8 = _register_8(opcode & 0x07);
@@ -1580,7 +1649,7 @@ UINT CPU::rlc_r8() {
 }
 
 UINT CPU::rlc_mHL() {
-    std::cout << __func__ << '\n';
+
     // Z00C
 
     WORD hl = registers.read_16(HL);
@@ -1599,7 +1668,7 @@ UINT CPU::rlc_mHL() {
 }
 
 UINT CPU::rlca() {
-    std::cout << __func__ << '\n';
+
     // 000C
     
     BYTE rl = _rl(
@@ -1616,7 +1685,7 @@ UINT CPU::rlca() {
 }
 
 UINT CPU::rr_r8() {
-    std::cout << __func__ << '\n';
+
     // Z00C
 
     UINT r8 = _register_8(opcode & 0x07);
@@ -1633,7 +1702,7 @@ UINT CPU::rr_r8() {
 }
 
 UINT CPU::rr_mHL() {
-    std::cout << __func__ << '\n';
+
     // Z00C
 
     WORD hl = registers.read_16(HL);
@@ -1652,7 +1721,7 @@ UINT CPU::rr_mHL() {
 }
 
 UINT CPU::rra() {
-    std::cout << __func__ << '\n';
+
     // 000C
 
     BYTE rr = _rr(
@@ -1669,7 +1738,7 @@ UINT CPU::rra() {
 }
 
 UINT CPU::rrc_r8() {
-    std::cout << __func__ << '\n';
+
     // Z00C
 
     UINT r8 = _register_8(opcode & 0x07);
@@ -1686,7 +1755,7 @@ UINT CPU::rrc_r8() {
 }
 
 UINT CPU::rrc_mHL() {
-    std::cout << __func__ << '\n';
+
     // Z00C
 
     WORD hl = registers.read_16(HL);
@@ -1705,13 +1774,15 @@ UINT CPU::rrc_mHL() {
 }
 
 UINT CPU::rrca() {
-    std::cout << __func__ << '\n';
+
     // 000C
     
     BYTE rr = _rr(
         registers.read_8(A),
         false
     );
+    
+    registers.set_z_flag(0);
 
     registers.write_8(A, rr);
 
@@ -1720,7 +1791,7 @@ UINT CPU::rrca() {
 }
 
 UINT CPU::sla_r8() {
-    std::cout << __func__ << '\n';
+
     // Z00C
     
     UINT r8 = _register_8(opcode & 0x07);
@@ -1739,7 +1810,7 @@ UINT CPU::sla_r8() {
 }
 
 UINT CPU::sla_mHL() {
-    std::cout << __func__ << '\n';
+
     // Z00C
 
     WORD hl = registers.read_16(HL);
@@ -1757,7 +1828,7 @@ UINT CPU::sla_mHL() {
 }
 
 UINT CPU::sra_r8() {
-    std::cout << __func__ << '\n';
+
     // Z00C
     
     UINT r8 = _register_8(opcode & 0x07);
@@ -1777,7 +1848,7 @@ UINT CPU::sra_r8() {
 }
 
 UINT CPU::sra_mHL() {
-    std::cout << __func__ << '\n';
+
     // Z00C
 
     WORD hl = registers.read_16(HL);
@@ -1796,7 +1867,7 @@ UINT CPU::sra_mHL() {
 }
 
 UINT CPU::srl_r8() {
-    std::cout << __func__ << '\n';
+
     // Z00C
     
     UINT r8 = _register_8(opcode & 0x07);
@@ -1816,7 +1887,7 @@ UINT CPU::srl_r8() {
 }
 
 UINT CPU::srl_mHL() {
-    std::cout << __func__ << '\n';
+
     // Z00C
 
     WORD hl = registers.read_16(HL);
@@ -1837,8 +1908,12 @@ UINT CPU::srl_mHL() {
 // Load Instructions
 UINT CPU::ld_r8_r8(){
     
-    UINT a_r8 = (opcode >> 3u) & 0x07;
-    UINT b_r8 = opcode & 0x07;
+    UINT a_r8 = _register_8((opcode >> 3u) & 0x07);
+    UINT b_r8 = _register_8(opcode & 0x07);
+
+    // std::cout << "r8_1: " << out_r8(a_r8) << '\n'
+        // << "r8_2: " << out_r8(b_r8)
+        // << " val: " << (int) registers.read_8(b_r8) << '\n';
 
     registers.write_8(
         a_r8,
@@ -1851,8 +1926,11 @@ UINT CPU::ld_r8_r8(){
 
 UINT CPU::ld_r8_n8(){
 
-    UINT r8 = (opcode >> 3u) & 0x07;
+    UINT r8 = _register_8((opcode >> 3u) & 0x07);
     BYTE n8 = mmu.read(PC);
+
+    // std::cout << "r8: " << out_r8(r8) << '\n';
+    // std::cout << "n8: " << std::hex << (int) n8 << '\n';
 
     registers.write_8(
         r8,
@@ -1873,6 +1951,9 @@ UINT CPU::ld_r16_n16(){
         mmu.read(PC)
     );
 
+    // std::cout << "r16: " << out_r16(r16) << '\n';
+    // std::cout << "n16: " << std::hex << (int) n16 << '\n';
+
     registers.write_16(
         r16,
         n16
@@ -1887,9 +1968,10 @@ UINT CPU::ld_r16_n16(){
 UINT CPU::ld_mHL_r8(){
 
     WORD hl = registers.read_16(HL);
-
-    UINT r8 = _register_8(opcode & 0x07);
     
+    // std::cout << "hl: " << std::hex << (int) hl << '\n';
+    UINT r8 = _register_8(opcode & 0x07);
+    // std::cout << "r8: " << out_r8(r8) << '\n';
     mmu.write(
         hl,
         registers.read_8(r8)
@@ -1922,7 +2004,10 @@ UINT CPU::ld_r8_mHL(){
 
     BYTE mHL = mmu.read(hl);
 
-    UINT r8 = _register_8(opcode & 0x07);
+    UINT r8 = _register_8((opcode >> 3u) & 0x07);
+
+    // std::cout << std::hex << out_r8(r8) << " HL: " << (int) hl <<
+    //     " mHL: " << (int) mHL << '\n';
 
     registers.write_8(r8, mHL);
 
@@ -1933,12 +2018,14 @@ UINT CPU::ld_r8_mHL(){
 UINT CPU::ld_mr16_A(){
     
     UINT r16 = _register_16( (opcode >> 4u) & 0x03 );
-
+    // std::cout << "r16: " << out_r16(r16) << '\n'
+        // << "val: " << std::hex << (int) registers.read_16(r16) << '\n';
     mmu.write(
         registers.read_16(r16),
         registers.read_8(A)
     );
-    
+    // std::cout << "val: " << std::hex << (int) mmu.read(registers.read_16(r16)) << '\n';
+
     // 8 T Cycles
     return 8;
 }
@@ -1963,6 +2050,9 @@ UINT CPU::ld_mn16_A(){
 
 UINT CPU::ldh_mn16_A(){
 
+    // std::cout << "A: " << std::hex << (int) registers.read_8(A)
+    //     << '\n' << (int) 0xFF00 + mmu.read(PC) << '\n';
+
     BYTE n8 = mmu.read(PC);
 
     mmu.write(
@@ -1977,6 +2067,9 @@ UINT CPU::ldh_mn16_A(){
 }
 
 UINT CPU::ldh_mC_A(){
+    // std::cout << std::hex <<
+        // "Address: " <<
+        // (int) (0xFF00 + registers.read_8(C)) << '\n';
 
     mmu.write(
         0xFF00 + registers.read_8(C),
@@ -1990,6 +2083,8 @@ UINT CPU::ldh_mC_A(){
 UINT CPU::ld_A_mr16(){
 
     UINT r16 = _register_16( (opcode >> 4u) & 0x03 );
+
+    // std::cout << out_r16(r16) << '\n';
 
     registers.write_8(
         A,
@@ -2006,6 +2101,9 @@ UINT CPU::ld_A_mn16(){
         mmu.read(PC + 1),
         mmu.read(PC)
     );
+
+    // std::cout << "n16: " << std::hex << (int) n16 << '\n';
+    // std::cout << "val: " << std::hex << (int) mmu.read(n16) << '\n';
 
     registers.write_8(
         A,
@@ -2062,7 +2160,7 @@ UINT CPU::ld_mHLI_A(){
 UINT CPU::ld_mHLD_A(){
 
     WORD hl = registers.read_16(HL);
-
+    // std::cout << std::hex << "hl: " << (int) hl << '\n';
     mmu.write(
         hl,
         registers.read_8(A)
@@ -2077,7 +2175,8 @@ UINT CPU::ld_mHLD_A(){
 UINT CPU::ld_A_mHLI(){
 
     WORD hl = registers.read_16(HL);
-
+    // std::cout << "hl: " << std::hex << (int) hl << '\n'
+    //     << "val: " << (int) mmu.read(hl) << '\n';
     registers.write_8(
         A,
         mmu.read(hl)
@@ -2120,9 +2219,9 @@ bool CPU::_condition(UINT c) {
 }
 
 void CPU::_call(WORD address) {
-    mmu.write(SP - 1, lsb(PC));
+    mmu.write(SP - 1, msb(PC));
 
-    mmu.write(SP - 2, msb(PC));
+    mmu.write(SP - 2, lsb(PC));
 
     SP -= 2;
 
@@ -2130,12 +2229,14 @@ void CPU::_call(WORD address) {
 }
 
 UINT CPU::call_n16() {
-    std::cout << __func__ << '\n';
+
 
     WORD n16 = concat(
         mmu.read(PC + 1),
         mmu.read(PC)
     );
+
+    PC += 2;
 
     _call(n16);
 
@@ -2144,11 +2245,13 @@ UINT CPU::call_n16() {
 }
 
 UINT CPU::call_cc_n16() {
-    std::cout << __func__ << '\n';
+
     WORD n16 = concat(
         mmu.read(PC + 1),
         mmu.read(PC)
     );
+
+    PC += 2;
 
     bool cc = _condition( (opcode >> 3u) & 0x03 );
 
@@ -2159,14 +2262,12 @@ UINT CPU::call_cc_n16() {
         return 24;
     }
 
-    PC += 2;
-
     // 12 T Cycles
     return 12;
 }
 
 UINT CPU::jp_HL() {
-    std::cout << __func__ << '\n';
+
 
     PC = registers.read_16(HL);
 
@@ -2175,7 +2276,7 @@ UINT CPU::jp_HL() {
 }
 
 UINT CPU::jp_n16() {
-    std::cout << __func__ << '\n';
+
 
     WORD n16 = concat(
         mmu.read(PC + 1),
@@ -2189,7 +2290,7 @@ UINT CPU::jp_n16() {
 }
 
 UINT CPU::jp_cc_n16() {
-    std::cout << __func__ << '\n';
+
 
     WORD n16 = concat(
         mmu.read(PC + 1),
@@ -2212,7 +2313,7 @@ UINT CPU::jp_cc_n16() {
 }
 
 UINT CPU::jr_n16() {
-    std::cout << __func__ << '\n';
+
 
     SIGNED_BYTE n8 = mmu.read(PC);
 
@@ -2224,29 +2325,33 @@ UINT CPU::jr_n16() {
 }
 
 UINT CPU::jr_cc_n16() {
-    std::cout << __func__ << '\n';
+
 
     SIGNED_BYTE n8 = mmu.read(PC);
 
     bool cc = _condition( (opcode >> 3u) & 0x03 );
+    
+    // std::cout << "opcode: " << std::hex << (int) opcode << '\n';
+    // std::cout << "n8: " << std::hex << (int) n8 << '\n';
+    // std::cout << "PC current: " << std::hex << (int) PC << '\n';
+    // std::cout << "PC relative: " << (int) (PC + n8 + 1) << '\n';
 
     if(cc) {
         // FIXME signed and unsigend arithmetic?
         PC += n8 + 1;
 
-        // 8 T Cycles
-        return 8;
+        // 12 T Cycles
+        return 12;
     }
 
     PC += 1;
 
-    // 12 T Cycles
-    return 12;
+    // 8 T Cycles
+    return 8;
 }
 
 UINT CPU::ret() {
-    std::cout << __func__ << '\n';
-    
+
     WORD p = concat(
         mmu.read(SP + 1),
         mmu.read(SP)
@@ -2261,7 +2366,7 @@ UINT CPU::ret() {
 }
 
 UINT CPU::ret_cc() {
-    std::cout << __func__ << '\n';
+
 
     bool cc = _condition( (opcode >> 3u) & 0x03 );
 
@@ -2277,7 +2382,7 @@ UINT CPU::ret_cc() {
 }
 
 UINT CPU::reti() {
-    std::cout << __func__ << '\n';
+
     // FIXME set IME
 
     ret();
@@ -2289,7 +2394,7 @@ UINT CPU::reti() {
 }
 
 UINT CPU::rst() {
-    std::cout << __func__ << '\n';
+
 
     WORD vec = opcode & 0b00111000;
 
@@ -2301,7 +2406,7 @@ UINT CPU::rst() {
 
 // Stack Operations Instructions
 UINT CPU::add_HL_SP() {
-    std::cout << __func__ << '\n';
+
     // -0HC
 
     WORD sum = _add_16(
@@ -2316,12 +2421,13 @@ UINT CPU::add_HL_SP() {
 }
 
 UINT CPU::add_SP_e8() {
-    std::cout << __func__ << '\n';
+
 
     SIGNED_BYTE e8 = mmu.read(PC);
 
     // Set flags
     _add_8((BYTE) SP, e8, false);
+    registers.set_z_flag(0);
 
     SP += e8;
 
@@ -2332,7 +2438,7 @@ UINT CPU::add_SP_e8() {
 }
 
 UINT CPU::dec_SP() {
-    std::cout << __func__ << '\n';
+
 
     SP -= 1;
 
@@ -2341,7 +2447,7 @@ UINT CPU::dec_SP() {
 }
 
 UINT CPU::inc_SP() {
-    std::cout << __func__ << '\n';
+
 
     SP += 1;
 
@@ -2350,7 +2456,6 @@ UINT CPU::inc_SP() {
 }
 
 UINT CPU::ld_SP_n16() {
-    std::cout << __func__ << '\n';
     
     WORD n16 = concat(
         mmu.read(PC + 1),
@@ -2366,7 +2471,7 @@ UINT CPU::ld_SP_n16() {
 }
 
 UINT CPU::ld_mn16_SP() {
-    std::cout << __func__ << '\n';
+
 
     WORD n16 = concat(
         mmu.read(PC + 1),
@@ -2383,13 +2488,15 @@ UINT CPU::ld_mn16_SP() {
 }
 
 UINT CPU::ld_HL_SPe8() {
-    std::cout << __func__ << '\n';
+
     // 00HC
 
     SIGNED_BYTE e8 = mmu.read(PC);
     
     // set right flags
     _add_8((BYTE) SP, e8, false);
+    
+    registers.set_z_flag(0);
 
     registers.write_16(
         HL,
@@ -2403,8 +2510,7 @@ UINT CPU::ld_HL_SPe8() {
 }
 
 UINT CPU::ld_SP_HL() {
-    std::cout << __func__ << '\n';
-    
+
     SP = registers.read_16(HL);
 
     // 8 T Cycles
@@ -2412,12 +2518,14 @@ UINT CPU::ld_SP_HL() {
 }
 
 UINT CPU::pop_AF() {
-    std::cout << __func__ << '\n';
+
     // ZNHC
 
     BYTE a = mmu.read(SP + 1),
-         f = mmu.read(SP);
+         f = mmu.read(SP) & 0xF0;
         
+    
+
     registers.write_16(AF, concat(a, f));
 
     SP += 2;
@@ -2427,12 +2535,12 @@ UINT CPU::pop_AF() {
 }
 
 UINT CPU::pop_r16() {
-    std::cout << __func__ << '\n';
+
 
     UINT r16 = _register_16( (opcode >> 4u) & 0x03 );
 
-    BYTE lo = mmu.read(SP),
-         hi = mmu.read(SP + 1);
+    BYTE hi = mmu.read(SP + 1),
+         lo = mmu.read(SP);
 
     registers.write_16(
         r16,
@@ -2446,16 +2554,16 @@ UINT CPU::pop_r16() {
 }
 
 UINT CPU::push_AF() {
-    std::cout << __func__ << '\n';
+
 
     mmu.write(
-        SP - 1, 
+        SP - 1,
         registers.read_8(A)
     );
 
     mmu.write(
         SP - 2,
-        registers.read_8(F) & 0xF0
+        registers.read_8(F) & 0xF0    
     );
     
     SP -= 2;
@@ -2465,11 +2573,13 @@ UINT CPU::push_AF() {
 }
 
 UINT CPU::push_r16() {
-    std::cout << __func__ << '\n';
+
 
     UINT r16 = _register_16( (opcode >> 4u) & 0x03 );
 
     WORD r = registers.read_16(r16);
+
+    // std::cout << std::hex << out_r16(r16) << ": " << (int) r << '\n';
 
     mmu.write(
         SP - 1, 
@@ -2490,7 +2600,7 @@ UINT CPU::push_r16() {
 
 // Miscellaneous Instructions
 UINT CPU::ccf() {
-    std::cout << __func__ << '\n';
+
     // -00C
 
     registers.set_n_flag(0);
@@ -2506,7 +2616,7 @@ UINT CPU::ccf() {
 }
 
 UINT CPU::cpl() {
-    std::cout << __func__ << '\n';
+
     // -11-
     
     registers.write_8(
@@ -2523,7 +2633,7 @@ UINT CPU::cpl() {
 }
 
 UINT CPU::daa() {
-    std::cout << __func__ << '\n';
+
     // Z-0C
 
     // FIXME decimal adjust accumulator ??
@@ -2542,11 +2652,11 @@ UINT CPU::daa() {
             a -= 0x06;
         }
     } else {
-        if(c || a > 0x99) {
+        if( c || (a > 0x99) ) {
             a += 0x60;
             registers.set_c_flag(1);
         }
-        if(h || (a & 0x0F) > 0x09) {
+        if( h || ((a & 0x0F) > 0x09) ) {
             a += 0x06;
         }
     }
@@ -2555,12 +2665,14 @@ UINT CPU::daa() {
 
     registers.set_h_flag(0);
 
+    registers.write_8(A, a);
+
     // 4 T Cycles
     return 4;
 }
 
 UINT CPU::di() {
-    std::cout << __func__ << '\n';
+
 
     IME = 0;
 
@@ -2569,7 +2681,7 @@ UINT CPU::di() {
 }
 
 UINT CPU::ei() {
-    std::cout << __func__ << '\n';
+
 
     // Set IME on next instr
     EI = true;
@@ -2579,7 +2691,7 @@ UINT CPU::ei() {
 }
 
 UINT CPU::halt() {
-    std::cout << __func__ << '\n';
+
     halt_mode = true;
     
     // Wait for interrupt
@@ -2587,7 +2699,7 @@ UINT CPU::halt() {
 }
 
 UINT CPU::nop() {
-    std::cout << __func__ << '\n';
+
     // no operation
 
     // 4 T Cycles
@@ -2595,7 +2707,7 @@ UINT CPU::nop() {
 }
 
 UINT CPU::scf() {
-    std::cout << __func__ << '\n';
+
     // -001
 
     registers.set_n_flag(0);
@@ -2609,7 +2721,7 @@ UINT CPU::scf() {
 }
 
 UINT CPU::stop() {
-    std::cout << __func__ << '\n';
+
     sleep_mode = true;
     
     // Wait for interrupt or joypad

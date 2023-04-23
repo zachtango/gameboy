@@ -1,6 +1,6 @@
 #ifndef MMU_H
 #define MMU_H
-
+#include <iostream>
 #include "constants.h"
 
 #define MEMORY_BYTES 0x10000
@@ -22,8 +22,24 @@ public:
 
     int *ref_count;
 
-    void write(WORD address, BYTE b) { M[address] = b; }
-    BYTE read(WORD address) { return M[address]; }
+    void write(WORD address, BYTE b) {
+        // if(address == 0xFF02 or address == 0xFF01) {
+        //     std::cout << "WROTE TO " << std::hex << address << ' ' << (int) M[0xff02] << '\n';
+        // }
+
+        M[address] = b; 
+        if (M[0xff02] == 0x81) {
+            char c = M[0xff01];
+            printf("%c", c);
+            M[0xff02] = 0;
+        }
+    }
+    BYTE read(WORD address) { 
+        if(address == 0xFF44) {
+            return 0x90;
+        }
+        return M[address];
+    }
 
     void read_rom(const char file[]);
     void print_rom();

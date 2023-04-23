@@ -1,11 +1,11 @@
 #include "helpers.h"
-
+#include <iostream>
 BYTE msb(WORD w) {
-    return (w & 0xF0) >> 8;
+    return (w >> 8u) & 0x00FF;
 }
 
 BYTE lsb(WORD w) {
-    return (w & 0x0F);
+    return (w & 0x00FF);
 }
 
 WORD concat(BYTE _msb, BYTE _lsb) {

@@ -2,7 +2,8 @@
 #define CPU_H
 
 #include <unordered_map>
-
+#include <fstream>
+#include <string>
 #include "constants.h"
 #include "helpers.h"
 #include "mmu.h"
@@ -24,19 +25,33 @@
 
 class CPU {
 public:
-    CPU(MMU &mmu) : mmu(mmu) {
+    std::ofstream out;
+    UINT prev;
+    CPU(MMU &mmu, std::string s) : mmu(mmu) {
+        out.open(("../gameboy-doctor/" + s).c_str());
+
         halt_mode = false;
         sleep_mode = false;
         IME = true;
         EI = true;
+        prefix = false;
 
+        registers.write_8(A, 0x01);
+        registers.write_8(F, 0xB0);
+        registers.write_8(B, 0x00);
+        registers.write_8(C, 0x13);
+        registers.write_8(D, 0x00);
+        registers.write_8(E, 0xD8);
+        registers.write_8(H, 0x01);
+        registers.write_8(L, 0x4D);
+        
         SP = 0xFFFE;
-        PC = 0;
+        PC = 0x0100;
 
         init_instr_tables();
     }
 
-    UINT run_fde(bool);
+    UINT run_fde();
 
     typedef UINT (CPU::*cpu_instr)();
 
@@ -45,6 +60,7 @@ public:
     bool sleep_mode;
     bool IME;
     bool EI;
+    bool prefix;
 
 // private:
     class Registers {
@@ -62,23 +78,30 @@ public:
         }
 
         void write_16(UINT reg, WORD w) {
+            // std::cout << "w: " << std::hex << (int) w << '\n';
+            // std::cout << "msb: " << std::hex << (int) msb(w) << '\n';
+            // std::cout << "lsb: " << std::hex << (int) lsb(w) << '\n';
             R[reg] = msb(w);
             R[reg + 1] = lsb(w);
         }
 
         void set_z_flag(bool on) {
+            // std::cout << "z: " << (int) on << '\n';
             R[F] = set_bit(R[F], 7, on);
         }
 
         void set_n_flag(bool on) {
+            // std::cout << "n: " << (int) on << '\n';
             R[F] = set_bit(R[F], 6, on);
         }
 
         void set_h_flag(bool on) {
+            // std::cout << "h: " << (int) on << '\n';
             R[F] = set_bit(R[F], 5, on);
         }
 
         void set_c_flag(bool on) {
+            // std::cout << "c: " << (int) on << '\n';
             R[F] = set_bit(R[F], 4, on);
         }
 
@@ -162,11 +185,23 @@ public:
     void init_instr_tables();
 
     /*
+        Debug helper functions
+    */
+    void print_registers();
+
+    /*
+        Interrupt handling
+        https://gbdev.io/pandocs/Interrupts.html
+    */
+    void handle_interrupts();
+
+
+    /*
         Instruction Reference: 
             https://rgbds.gbdev.io/docs/v0.6.1/gbz80.7/
     */
     // Prefix
-    UINT prefix_cb();
+    UINT cb_prefix();
 
     // 8 bit Arithmetic and Logic Instructions
     BYTE _add_8(BYTE, BYTE, bool);
