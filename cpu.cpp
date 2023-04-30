@@ -554,26 +554,10 @@ void CPU::init_instr_tables() {
 }
 
 /*
-    Handle interrupts
-*/
-void CPU::handle_interrupts() {
-    // Reset IF bit of interrupt and IME flag
-
-    /*
-        call address of corresponding interrupt
-        
-    */
-
-
-}
-
-
-/*
     Debug helper functions
 */
 void CPU::print_registers() {
-    out << std::hex << std::uppercase <<
-        "$" << std::setw(4) << std::setfill('0') << (int) PC << ' ' <<
+    std::cout << std::hex << std::uppercase <<
         "A:" << std::setw(2) << std::setfill('0') << (int)(registers.read_8(A)) << ' ' <<
         "F:" << std::setw(2) << std::setfill('0') << (int)(registers.read_8(F)) << ' ' <<
         "B:" << std::setw(2) << std::setfill('0') << (int)(registers.read_8(B)) << ' ' <<
@@ -588,7 +572,7 @@ void CPU::print_registers() {
                 << std::setw(2) << std::setfill('0') << (int) mmu.read(PC + 1) << ','
                 << std::setw(2) << std::setfill('0') << (int) mmu.read(PC + 2) << ','
                 << std::setw(2) << std::setfill('0') << (int) mmu.read(PC + 3) << '\n';
-    out.flush();
+    // out.flush();
 }
 
 char out_r8(UINT r8) {
@@ -602,31 +586,29 @@ char* out_r16(UINT r16) {
     return c[r16];
 }
 
-/*
-    Instructions
-*/
-
 UINT CPU::run_fde() {
-    
+    if(PC == 0x0100)
+        *mmu.boot = false;
+
     // fetch
     opcode = mmu.read(PC);    
     // std::cout << std::hex << PC << ' '
     //     << std::setw(2)
     //     << std::setfill('0') << static_cast<int>(opcode) << '\n';
     
-    if(!prefix)
-        print_registers();
+    // if(!prefix)
+    //     print_registers();
     
-    prev = PC;
     PC += 1;
+
+    // std::cout << "PC: " << std::hex << (int) PC << '\n';
 
     // decode
     cpu_instr f;
 
-    bool reset_prefix = false;
     if(prefix) {
         f = cb_instr[opcode];
-        reset_prefix = true;
+        prefix = false;
     } else f = instr[opcode];
 
     // backtrace_symbols_fd((void*const*) &f, 1, 1);
@@ -634,20 +616,77 @@ UINT CPU::run_fde() {
     UINT cycles;
 
     // execute
-    if(EI) {
-        cycles = (this->*f)();
-        IME = true;
-        EI = false;
-    } else {
-        cycles = (this->*f)();
-        // might seem redundant but function might set EI
-        // FIXME, maybe there's a better way to dot his
-    }
-    
-    if(reset_prefix) prefix = false;
+    cycles = (this->*f)();
 
     return cycles;
 }
+
+/*
+    Handle interrupts
+*/
+UINT CPU::handle_interrupts() {
+
+    // Get interrupt by prio
+    
+    BYTE IE = mmu.read(0xFFFF),
+         IF = mmu.read(0xFF0F);
+
+    UINT interrupt_bit = 0;
+
+    for(; interrupt_bit <= 4; interrupt_bit += 1)
+        if(get_bit(IF, interrupt_bit) && get_bit(IE, interrupt_bit))
+            break;
+
+    // no interrupt to handle
+    if(interrupt_bit == 5) {
+        // std::cout << "No interrupt available\n";
+        return 0;
+    }
+
+    // Reset IF bit of interrupt and IME flag
+    mmu.write(
+        0xFF0F,
+        set_bit(IF, interrupt_bit, 0)
+    );
+
+    // 2 M Cycles of nothing
+
+    /*
+        Call address of corresponding interrupt
+        Bit 0: VBlank   (INT $40)
+        Bit 1: LCD STAT (INT $48)
+        Bit 2: Timer    (INT $50)
+        Bit 3: Serial   (INT $58)
+        Bit 4: Joypad   (INT $60)
+    */
+    static WORD address_map[] = {
+        0x0040, 
+        0x0048,
+        0x0050,
+        0x0058,
+        0x0060    
+    };
+
+    static std::string i_map[] = {
+        "VBlank",
+        "LCD Stat",
+        "Timer",
+        "Serial",
+        "Joypad" 
+    };
+    
+    // std::cout << "Handle " << i_map[interrupt_bit] << '\n';
+
+    // 3 M Cycles (pushing and setting PC)
+    _call(address_map[interrupt_bit]);
+
+    // 20 T Cycles
+    return 20;
+}
+
+/*
+    Instructions
+*/
 
 // Prefix
 UINT CPU::cb_prefix() {
@@ -2219,6 +2258,7 @@ bool CPU::_condition(UINT c) {
 }
 
 void CPU::_call(WORD address) {
+    // std::cout << "call: " << std::hex << (int) address << '\n';
     mmu.write(SP - 1, msb(PC));
 
     mmu.write(SP - 2, lsb(PC));
@@ -2681,8 +2721,7 @@ UINT CPU::di() {
 }
 
 UINT CPU::ei() {
-
-
+    std::cout << "Enable Interrupts\n";
     // Set IME on next instr
     EI = true;
 
@@ -2691,7 +2730,7 @@ UINT CPU::ei() {
 }
 
 UINT CPU::halt() {
-
+    // std::cout << "halted\n";
     halt_mode = true;
     
     // Wait for interrupt

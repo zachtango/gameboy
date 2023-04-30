@@ -26,3 +26,7 @@ BYTE set_bit(BYTE b, UINT bit, bool on) {
     
     return b;
 }
+
+void print_byte(BYTE b) {
+    std::cout << std::hex << (int) b;
+}

@@ -9,4 +9,6 @@ WORD concat(BYTE _msb, BYTE _lsb);
 bool get_bit(BYTE b, UINT bit);
 BYTE set_bit(BYTE b, UINT bit, bool on);
 
+void print_byte(BYTE b);
+
 #endif

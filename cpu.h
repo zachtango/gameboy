@@ -22,19 +22,24 @@
 #define DE 4
 #define HL 6
 
+#define IE_ADDRESS 0xFFFF
+#define IF_ADDRESS 0xFF0F
 
 class CPU {
 public:
     std::ofstream out;
-    UINT prev;
+
+    UINT elapsed_cycles;
+
     CPU(MMU &mmu, std::string s) : mmu(mmu) {
         out.open(("../gameboy-doctor/" + s).c_str());
 
         halt_mode = false;
         sleep_mode = false;
-        IME = true;
-        EI = true;
+        IME = false;
+        EI = false;
         prefix = false;
+        elapsed_cycles = 0;
 
         registers.write_8(A, 0x01);
         registers.write_8(F, 0xB0);
@@ -44,9 +49,21 @@ public:
         registers.write_8(E, 0xD8);
         registers.write_8(H, 0x01);
         registers.write_8(L, 0x4D);
+
+        registers.write_8(A, 0x00);
+        registers.write_8(F, 0x00);
+        registers.write_8(B, 0x00);
+        registers.write_8(C, 0x00);
+        registers.write_8(D, 0x00);
+        registers.write_8(E, 0x00);
+        registers.write_8(H, 0x00);
+        registers.write_8(L, 0x00);
         
         SP = 0xFFFE;
         PC = 0x0100;
+
+        SP = 0;
+        PC = 0;
 
         init_instr_tables();
     }
@@ -193,9 +210,8 @@ public:
         Interrupt handling
         https://gbdev.io/pandocs/Interrupts.html
     */
-    void handle_interrupts();
-
-
+    UINT handle_interrupts();
+    
     /*
         Instruction Reference: 
             https://rgbds.gbdev.io/docs/v0.6.1/gbz80.7/
