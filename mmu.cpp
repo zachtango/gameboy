@@ -38,8 +38,8 @@ void MMU::write(WORD address, BYTE b) {
             Destination: $FE00-$FE9F
         */
         WORD source = b << 8;
-        for(int i = 0; i < 0xA0; i++) {
-            M[source + i] = M[0xFE00 + i];
+        for(WORD i = 0; i < 0xA0; i++) {
+            M[0xFE00 + i] = M[source + i];
         }
     } else if(address == 0xFFFF) {
         std::cout << "Write to IE register\n";

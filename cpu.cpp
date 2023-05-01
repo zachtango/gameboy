@@ -587,8 +587,20 @@ char* out_r16(UINT r16) {
 }
 
 UINT CPU::run_fde() {
-    if(PC == 0x0100)
+    if(PC == 0x0100) {
+        registers.write_8(A, 0x01);
+        registers.write_8(F, 0xB0);
+        registers.write_8(B, 0x00);
+        registers.write_8(C, 0x13);
+        registers.write_8(D, 0x00);
+        registers.write_8(E, 0xD8);
+        registers.write_8(H, 0x01);
+        registers.write_8(L, 0x4D);
+        
+        SP = 0xFFFE;
+        
         *mmu.boot = false;
+    }
 
     // fetch
     opcode = mmu.read(PC);    

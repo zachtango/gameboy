@@ -57,7 +57,7 @@ int main() {
         MMU mmu;
         mmu.load_boot_rom("DMG_ROM.bin");
         // mmu.load_rom(("individual/" + s).c_str());
-        mmu.load_rom("dmg-acid2.gb");
+        mmu.load_rom("DrMario.gb");
         // mmu.load_rom("DMG_ROM.bin");
 
         PPU ppu = PPU(mmu);
