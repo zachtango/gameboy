@@ -2,22 +2,29 @@
 #define MMU_H
 #include <iostream>
 #include "constants.h"
+#include "joypad.h"
 
 #define MEMORY_BYTES 0x10000
 
 class MMU {
 public:
-    MMU() : ref_count(new int(1)), 
+    MMU(Joypad* joypad) : 
+        joypad(joypad),
+        ref_count(new int(1)), 
         M(new BYTE[MEMORY_BYTES]),
         BOOT_M(new BYTE[256]),
         write_to_tile(new bool(false)),
+        write_to_dma(new bool(false)),
         reset_div(new bool(false)),
         boot(new bool(true)) {}
 
-    MMU(MMU &rhs) : M(rhs.M),
+    MMU(MMU &rhs) : 
+        joypad(rhs.joypad),
+        M(rhs.M),
         BOOT_M(rhs.BOOT_M),
         ref_count(rhs.ref_count),
         write_to_tile(rhs.write_to_tile),
+        write_to_dma(rhs.write_to_dma),
         reset_div(rhs.reset_div),
         boot(rhs.boot) {
         *ref_count += 1;
@@ -29,18 +36,17 @@ public:
             delete write_to_tile;
             delete reset_div;
             delete[] M;
+            delete[] BOOT_M;
         }
     }
+
+    Joypad* joypad;
 
     int *ref_count;
 
     void write(WORD address, BYTE b);
     
-    BYTE read(WORD address) {
-        if(address < 0x100 && *boot)
-            return BOOT_M[address];
-        return M[address];
-    }
+    BYTE read(WORD address);
 
     void print_rom();
 
@@ -48,9 +54,11 @@ public:
     void load_rom(const char file[]);
 
     bool *write_to_tile;
+    bool *write_to_dma;
 
     bool *reset_div;
     bool *boot;
+    
 
 // private:
     /*

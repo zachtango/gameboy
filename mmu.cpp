@@ -2,6 +2,7 @@
 #include <iostream>
 
 #include "mmu.h"
+#include "helpers.h"
 
 
 void MMU::print_rom() {
@@ -10,6 +11,25 @@ void MMU::print_rom() {
         std::cout << std::hex << std::setw(2) << 
             std::setfill('0') << static_cast<int>(M[i]) << '\n';
     }
+}
+
+BYTE MMU::read(WORD address) {
+    if(address < 0x100 && *boot)
+        return BOOT_M[address];
+    else if(address == 0xFF00) {
+        BYTE j = M[0xFF00];
+        std::cout << "read joypad\n";
+        std::cout << std::hex << (int) joypad->p1 << '\n';
+        if(!get_bit(j, 5)) {
+            // Upper 4 bits
+            return j | (0x00FF & ~(joypad->p1 >> 4));
+        } else if(!get_bit(j, 4)) {
+            // Lower 4 bits
+            return j | (0x0FF & ~(joypad->p1));
+        }
+    }
+
+    return M[address];
 }
 
 void MMU::write(WORD address, BYTE b) {
@@ -30,6 +50,7 @@ void MMU::write(WORD address, BYTE b) {
 
     // https://gbdev.io/pandocs/OAM_DMA_Transfer.html
     else if(address == 0xFF46) {
+        *write_to_dma = true;
         std::cout << "Write to DMA\n";
         // DMA transfer
 
@@ -73,6 +94,37 @@ void MMU::load_boot_rom(const char file_name[]) {
 }
 
 void MMU::load_rom(const char file_name[]) {
+    static char *rom_type[0x100] {
+        [0x00] = "ROM ONLY",
+        [0x01] = "MBC1",
+        [0x02] = "MBC1+RAM",
+        [0x03] = "MBC1+RAM+BATTERY",
+        [0x05] = "MBC2",
+        [0x06] = "MBC2+BATTERY",
+        [0x08] = "ROM+RAM 1",
+        [0x09] = "ROM+RAM+BATTERY 1",
+        [0x0B] = "MMM01",
+        [0x0C] = "MMM01+RAM",
+        [0x0D] = "MMM01+RAM+BATTERY",
+        [0x0F] = "MBC3+TIMER+BATTERY",
+        [0x10] = "MBC3+TIMER+RAM+BATTERY 2",
+        [0x11] = "MBC3",
+        [0x12] = "MBC3+RAM 2",
+        [0x13] = "MBC3+RAM+BATTERY 2",
+        [0x19] = "MBC5",
+        [0x1A] = "MBC5+RAM",
+        [0x1B] = "MBC5+RAM+BATTERY",
+        [0x1C] = "MBC5+RUMBLE",
+        [0x1D] = "MBC5+RUMBLE+RAM",
+        [0x1E] = "MBC5+RUMBLE+RAM+BATTERY",
+        [0x20] = "MBC6",
+        [0x22] = "MBC7+SENSOR+RUMBLE+RAM+BATTERY",
+        [0xFC] = "POCKET CAMERA",
+        [0xFD] = "BANDAI TAMA5",
+        [0xFE] = "HuC3",
+        [0xFF] = "HuC1+RAM+BATTERY",
+    };
+
     std::ifstream file(file_name, std::ios::binary);
 
     if(!file.is_open()) {
@@ -109,15 +161,17 @@ void MMU::load_rom(const char file_name[]) {
     std::cout << "\tTitle: ";
 
     for(WORD address = 0x0134; address <= 0x0143; address += 1) {
-        if(M[address] == 0) {
-            std::cout << '\n';
+        if(M[address] == 0)
             break;
-        }
         std::cout << M[address];
     }
+    std::cout << '\n';
 
     // ROM size
-    std::cout << "\tROM size: " << (int) (32 * (1 << size)) << "KiB\n";
+    std::cout << "\tROM Size: " << (int) (32 * (1 << size)) << "KiB\n";
+
+    // ROM type
+    std::cout << "\tROM Type: " << rom_type[M[0x0147]] << '\n';
 
     // Header checksum
     std::cout << "\tChecksum: " << std::hex << std::setw(2) << std::setfill('0') << (int) checksum << ' ' <<
