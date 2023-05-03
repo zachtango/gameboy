@@ -14,11 +14,11 @@ WORD concat(BYTE _msb, BYTE _lsb) {
     return c;
 }
 
-bool get_bit(BYTE b, UINT bit) {
+bool get_bit(BYTE b, U32 bit) {
     return (b >> bit) & 0x01;
 }
 
-BYTE set_bit(BYTE b, UINT bit, bool on) {
+BYTE set_bit(BYTE b, U32 bit, bool on) {
     if(on)
         b |= (1u << bit);
     else 

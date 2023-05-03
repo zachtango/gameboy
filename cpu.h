@@ -22,25 +22,18 @@
 #define DE 4
 #define HL 6
 
-#define IE_ADDRESS 0xFFFF
-#define IF_ADDRESS 0xFF0F
 
 class CPU {
 public:
-    std::ofstream out;
-
-    UINT elapsed_cycles;
-
-    CPU(MMU &mmu, std::string s) : mmu(mmu) {
-        out.open(("../gameboy-doctor/" + s).c_str());
+    CPU(MMU &mmu) : mmu(mmu) {
+        // Map opcode to correct function pointer
+        init_instr_tables();
 
         halt_mode = false;
-        sleep_mode = false;
-        IME = false;
-        EI = false;
         prefix = false;
-        elapsed_cycles = 0;
 
+        // https://gbdev.io/pandocs/Power_Up_Sequence.html#cpu-registers
+        // CPU State after BOOT ROM transfers to CART ROM
         registers.write_8(A, 0x01);
         registers.write_8(F, 0xB0);
         registers.write_8(B, 0x00);
@@ -49,76 +42,78 @@ public:
         registers.write_8(E, 0xD8);
         registers.write_8(H, 0x01);
         registers.write_8(L, 0x4D);
-
-        registers.write_8(A, 0x00);
-        registers.write_8(F, 0x00);
-        registers.write_8(B, 0x00);
-        registers.write_8(C, 0x00);
-        registers.write_8(D, 0x00);
-        registers.write_8(E, 0x00);
-        registers.write_8(H, 0x00);
-        registers.write_8(L, 0x00);
         
         SP = 0xFFFE;
         PC = 0x0100;
-
-        SP = 0;
-        PC = 0;
-
-        init_instr_tables();
     }
 
-    UINT run_fde();
+    MMU mmu;
 
-    typedef UINT (CPU::*cpu_instr)();
-
-    // CPU states
+    // CPU halt flag
     bool halt_mode;
-    bool sleep_mode;
-    bool IME;
-    bool EI;
+
+    /* MASTER SEQUENCE (returns number of cycles taken) */
+    U32 fetch_decode_execute();
+    
+    /* DEBUG FUNCTIONS */
+    void print_registers();
+
+private:
+    /* INSTRUCTION OPCODE MAPPINGS */
+    typedef U32 (CPU::*cpu_instr)();
+
+    // opcode to instruction function pointer map
+    std::unordered_map<BYTE, cpu_instr> instr;
+    
+    // opcode to cb prefixed instruction function pointer map
+    std::unordered_map<BYTE, cpu_instr> cb_instr;
+
+    // Map opcode to instruction functions for instr and cb_instr table
+    void init_instr_tables();
+
+    // Lets next FDE know that instruction is CB PREFIXED
     bool prefix;
 
-// private:
+    // Current instruction opcode
+    BYTE opcode;
+
+    /* INTERNAL REGISTERS */
+    WORD SP; // stack pointer
+    WORD PC; // PC counter pointing to memory address of current instruction
+
+    /* AF BC DE HL REGISTER CLASS */
     class Registers {
     public:
-        BYTE read_8(UINT reg) {
+        BYTE read_8(U32 reg) {
             return R[reg];
         }
 
-        void write_8(UINT reg, BYTE b) {
+        void write_8(U32 reg, BYTE b) {
             R[reg] = b;
         }
 
-        WORD read_16(UINT reg) {
+        WORD read_16(U32 reg) {
             return concat(R[reg], R[reg + 1]);
         }
 
-        void write_16(UINT reg, WORD w) {
-            // std::cout << "w: " << std::hex << (int) w << '\n';
-            // std::cout << "msb: " << std::hex << (int) msb(w) << '\n';
-            // std::cout << "lsb: " << std::hex << (int) lsb(w) << '\n';
+        void write_16(U32 reg, WORD w) {
             R[reg] = msb(w);
             R[reg + 1] = lsb(w);
         }
 
         void set_z_flag(bool on) {
-            // std::cout << "z: " << (int) on << '\n';
             R[F] = set_bit(R[F], 7, on);
         }
 
         void set_n_flag(bool on) {
-            // std::cout << "n: " << (int) on << '\n';
             R[F] = set_bit(R[F], 6, on);
         }
 
         void set_h_flag(bool on) {
-            // std::cout << "h: " << (int) on << '\n';
             R[F] = set_bit(R[F], 5, on);
         }
 
         void set_c_flag(bool on) {
-            // std::cout << "c: " << (int) on << '\n';
             R[F] = set_bit(R[F], 4, on);
         }
 
@@ -138,7 +133,6 @@ public:
             return get_bit(R[F], 4);
         }
         
-    private:
         /*
             Registers 
                 A = 0, 
@@ -153,8 +147,11 @@ public:
         BYTE R[7];
     };
 
-    // register encodings
-    UINT _register_8(UINT r) {
+    Registers registers; // registers AF, BC, DE, HL
+
+
+    /* REGISTER ENCODINGS FOR INSTRUCTION SET */
+    U32 _register_8(U32 r) {
         switch(r) {
             case 0:
                 return B;
@@ -175,7 +172,7 @@ public:
         }
     }
 
-    UINT _register_16(UINT r) {
+    U32 _register_16(U32 r) {
         switch(r) {
             case 0:
                 return BC;
@@ -190,34 +187,12 @@ public:
         }
     }
 
-    WORD SP;
-    WORD PC;
-    BYTE opcode;
-    Registers registers;
-    MMU mmu;
-
-    std::unordered_map<BYTE, cpu_instr> instr;
-    std::unordered_map<BYTE, cpu_instr> cb_instr;
-
-    void init_instr_tables();
-
     /*
-        Debug helper functions
-    */
-    void print_registers();
-
-    /*
-        Interrupt handling
-        https://gbdev.io/pandocs/Interrupts.html
-    */
-    UINT handle_interrupts();
-    
-    /*
-        Instruction Reference: 
-            https://rgbds.gbdev.io/docs/v0.6.1/gbz80.7/
+        CPU INSTRUCTIONS
+        https://rgbds.gbdev.io/docs/v0.6.1/gbz80.7/
     */
     // Prefix
-    UINT cb_prefix();
+    U32 cb_prefix();
 
     // 8 bit Arithmetic and Logic Instructions
     BYTE _add_8(BYTE, BYTE, bool);
@@ -236,67 +211,67 @@ public:
     void _sub_A_mHL(bool);
     void _sub_A_n8(bool);
 
-    UINT adc_A_r8();
-    UINT adc_A_mHL();
-    UINT adc_A_n8();
+    U32 adc_A_r8();
+    U32 adc_A_mHL();
+    U32 adc_A_n8();
 
-    UINT add_A_r8();
-    UINT add_A_mHL();
-    UINT add_A_n8();
+    U32 add_A_r8();
+    U32 add_A_mHL();
+    U32 add_A_n8();
 
-    UINT and_A_r8();
-    UINT and_A_mHL();
-    UINT and_A_n8();
+    U32 and_A_r8();
+    U32 and_A_mHL();
+    U32 and_A_n8();
 
-    UINT cp_A_r8();
-    UINT cp_A_mHL();
-    UINT cp_A_n8();
+    U32 cp_A_r8();
+    U32 cp_A_mHL();
+    U32 cp_A_n8();
     
-    UINT dec_r8();
-    UINT dec_mHL();
-    UINT inc_r8();
-    UINT inc_mHL();
+    U32 dec_r8();
+    U32 dec_mHL();
+    U32 inc_r8();
+    U32 inc_mHL();
     
-    UINT or_A_r8();
-    UINT or_A_mHL();
-    UINT or_A_n8();
+    U32 or_A_r8();
+    U32 or_A_mHL();
+    U32 or_A_n8();
     
-    UINT sbc_A_r8();
-    UINT sbc_A_mHL();
-    UINT sbc_A_n8();
+    U32 sbc_A_r8();
+    U32 sbc_A_mHL();
+    U32 sbc_A_n8();
 
-    UINT sub_A_r8();
-    UINT sub_A_mHL();
-    UINT sub_A_n8();
+    U32 sub_A_r8();
+    U32 sub_A_mHL();
+    U32 sub_A_n8();
     
-    UINT xor_A_r8();
-    UINT xor_A_mHL();
-    UINT xor_A_n8();
+    U32 xor_A_r8();
+    U32 xor_A_mHL();
+    U32 xor_A_n8();
 
     // 16 bit Arithmetic Instructions
     WORD _add_16(WORD, WORD);
 
-    UINT add_HL_r16();
-    UINT dec_r16();
-    UINT inc_r16();
+    U32 add_HL_r16();
+    U32 dec_r16();
+    U32 inc_r16();
 
     // Bit Operations Instructions
-    void _bit(BYTE, UINT);
-    BYTE _res(BYTE, UINT);
-    BYTE _set(BYTE, UINT);
+    void _bit(BYTE, U32);
+    BYTE _res(BYTE, U32);
+    BYTE _set(BYTE, U32);
     BYTE _swap(BYTE);
 
-    UINT bit_u3_r8();
-    UINT bit_u3_mHL();
+    U32 bit_u3_r8();
+    U32 bit_u3_mHL();
 
-    UINT res_u3_r8();
-    UINT res_u3_mHL();
+    U32 res_u3_r8();
+    U32 res_u3_mHL();
     
-    UINT set_u3_r8();
-    UINT set_u3_mHL();
+    U32 set_u3_r8();
+    U32 set_u3_mHL();
 
-    UINT swap_r8();
-    UINT swap_mHL();
+    U32 swap_r8();
+    U32 swap_mHL();
 
     // Bit Shift Instructions
     BYTE _rl(BYTE, bool);
@@ -304,89 +279,89 @@ public:
     BYTE _sl(BYTE);
     BYTE _sr(BYTE, bool);
 
-    UINT rl_r8();
-    UINT rl_mHL();
-    UINT rla();
-    UINT rlc_r8();
-    UINT rlc_mHL();
-    UINT rlca();
+    U32 rl_r8();
+    U32 rl_mHL();
+    U32 rla();
+    U32 rlc_r8();
+    U32 rlc_mHL();
+    U32 rlca();
 
-    UINT rr_r8();
-    UINT rr_mHL();
-    UINT rra();
-    UINT rrc_r8();
-    UINT rrc_mHL();
-    UINT rrca();
+    U32 rr_r8();
+    U32 rr_mHL();
+    U32 rra();
+    U32 rrc_r8();
+    U32 rrc_mHL();
+    U32 rrca();
 
-    UINT sla_r8();
-    UINT sla_mHL();
+    U32 sla_r8();
+    U32 sla_mHL();
 
-    UINT sra_r8();
-    UINT sra_mHL();
+    U32 sra_r8();
+    U32 sra_mHL();
 
-    UINT srl_r8();
-    UINT srl_mHL();
+    U32 srl_r8();
+    U32 srl_mHL();
 
     // Load Instructions
-    UINT ld_r8_r8();
-    UINT ld_r8_n8();
-    UINT ld_r16_n16();
-    UINT ld_mHL_r8();
-    UINT ld_mHL_n8();
-    UINT ld_r8_mHL();
-    UINT ld_mr16_A();
-    UINT ld_mn16_A();
-    UINT ldh_mn16_A();
-    UINT ldh_mC_A();
-    UINT ld_A_mr16();
-    UINT ld_A_mn16();
-    UINT ldh_A_mn16();
-    UINT ldh_A_mC();
-    UINT ld_mHLI_A();
-    UINT ld_mHLD_A();
-    UINT ld_A_mHLI();
-    UINT ld_A_mHLD();
+    U32 ld_r8_r8();
+    U32 ld_r8_n8();
+    U32 ld_r16_n16();
+    U32 ld_mHL_r8();
+    U32 ld_mHL_n8();
+    U32 ld_r8_mHL();
+    U32 ld_mr16_A();
+    U32 ld_mn16_A();
+    U32 ldh_mn16_A();
+    U32 ldh_mC_A();
+    U32 ld_A_mr16();
+    U32 ld_A_mn16();
+    U32 ldh_A_mn16();
+    U32 ldh_A_mC();
+    U32 ld_mHLI_A();
+    U32 ld_mHLD_A();
+    U32 ld_A_mHLI();
+    U32 ld_A_mHLD();
 
     // Jump and Subroutines
-    bool _condition(UINT);
+    bool _condition(U32);
     void _call(WORD);
 
-    UINT call_n16();
-    UINT call_cc_n16();
-    UINT jp_HL();
-    UINT jp_n16();
-    UINT jp_cc_n16();
-    UINT jr_n16();
-    UINT jr_cc_n16();
-    UINT ret_cc();
-    UINT ret();
-    UINT reti();
-    UINT rst();
+    U32 call_n16();
+    U32 call_cc_n16();
+    U32 jp_HL();
+    U32 jp_n16();
+    U32 jp_cc_n16();
+    U32 jr_n16();
+    U32 jr_cc_n16();
+    U32 ret_cc();
+    U32 ret();
+    U32 reti();
+    U32 rst();
 
     // Stack Operations Instructions
-    UINT add_HL_SP();
-    UINT add_SP_e8();
-    UINT dec_SP();
-    UINT inc_SP();
-    UINT ld_SP_n16();
-    UINT ld_mn16_SP();
-    UINT ld_HL_SPe8();
-    UINT ld_SP_HL();
-    UINT pop_AF();
-    UINT pop_r16();
-    UINT push_AF();
-    UINT push_r16();
+    U32 add_HL_SP();
+    U32 add_SP_e8();
+    U32 dec_SP();
+    U32 inc_SP();
+    U32 ld_SP_n16();
+    U32 ld_mn16_SP();
+    U32 ld_HL_SPe8();
+    U32 ld_SP_HL();
+    U32 pop_AF();
+    U32 pop_r16();
+    U32 push_AF();
+    U32 push_r16();
 
     // Miscellaneous Instructions
-    UINT ccf();
-    UINT cpl();
-    UINT daa();
-    UINT di();
-    UINT ei();
-    UINT halt();
-    UINT nop();
-    UINT scf();
-    UINT stop();
+    U32 ccf();
+    U32 cpl();
+    U32 daa();
+    U32 di();
+    U32 ei();
+    U32 halt();
+    U32 nop();
+    U32 scf();
+    U32 stop();
 };
 
 #endif

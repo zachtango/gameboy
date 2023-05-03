@@ -6,8 +6,8 @@
 BYTE msb(WORD w);
 BYTE lsb(WORD w);
 WORD concat(BYTE _msb, BYTE _lsb);
-bool get_bit(BYTE b, UINT bit);
-BYTE set_bit(BYTE b, UINT bit, bool on);
+bool get_bit(BYTE b, U32 bit);
+BYTE set_bit(BYTE b, U32 bit, bool on);
 
 void print_byte(BYTE b);
 

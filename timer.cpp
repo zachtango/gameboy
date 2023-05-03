@@ -29,19 +29,19 @@ void Timer::increment() {
         return;
 
     // Increment at freq of TAC
-    static UINT freq_map[] = {
+    static U32 freq_map[] = {
         9, 3, 5, 7
     };
     
     bool timer_update = ( prev_div & (1 << freq_map[tac & 0b11]) ) && !( div & (1 << freq_map[tac & 0b11]) );
-
+    // std::cout << timer_update << '\n';
     if(timer_update) {
         tima += 1;
-
+        
         if(tima == 0x00) {
             tma = mmu.read(TMA_ADDRESS);
             tima = tma;
-            
+            // std::cout << "timer interrupt sent\n";
             // send timer interrupt
             mmu.write(
                 0xFF0F,
