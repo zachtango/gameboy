@@ -6,7 +6,6 @@
 #include <string>
 #include "constants.h"
 #include "helpers.h"
-#include "mmu.h"
 
 #define A 0
 #define F 1
@@ -22,6 +21,7 @@
 #define DE 4
 #define HL 6
 
+class MMU;
 
 class CPU {
 public:
@@ -47,8 +47,6 @@ public:
         PC = 0x0100;
     }
 
-    MMU mmu;
-
     // CPU halt flag
     bool halt_mode;
 
@@ -58,7 +56,12 @@ public:
     /* DEBUG FUNCTIONS */
     void print_registers();
 
+    // Interrupts tightly coupled with CPU
+    friend class Interrupts;
 private:
+    // For reading and writing to memory
+    MMU &mmu;
+
     /* INSTRUCTION OPCODE MAPPINGS */
     typedef U32 (CPU::*cpu_instr)();
 

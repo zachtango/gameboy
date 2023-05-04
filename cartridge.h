@@ -4,6 +4,7 @@
 #include "constants.h"
 
 class Cartridge {
+public:
     // FIXME HANDLE MBCs
     
     /* LOAD ROM */

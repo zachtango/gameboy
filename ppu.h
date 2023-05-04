@@ -1,7 +1,12 @@
+#ifndef PPU_H
+#define PPU_H
+
 #include <utility>
 #include "constants.h"
 #include "helpers.h"
-#include "mmu.h"
+#include "interrupts.h"
+
+class Interrupts;
 
 typedef enum ppu_mode {
     oam_scan = 2,
@@ -12,7 +17,7 @@ typedef enum ppu_mode {
 
 class PPU {
 public:
-    PPU(MMU &mmu) : mmu(mmu) {
+    PPU(Interrupts &interrupts) : interrupts(interrupts) {
         // initialize PPU state
         mode = ppu_mode::oam_scan;
         ly = 0;
@@ -54,9 +59,9 @@ private:
     /* PPU MODE HELPERS */
     void write_line();
     void increment_ly();
-
-    // For reading and writing to memory
-    MMU mmu;
+    
+    // For sending VBLANK and LCD_STAT interrupts
+    Interrupts &interrupts;
 
     ppu_mode mode;
 
@@ -114,3 +119,5 @@ private:
     // Clear lower 2 bits of status and OR the mode
     #define SET_PPU_MODE(mode) { status = (status & 0xFC) | mode; }
 };
+
+#endif

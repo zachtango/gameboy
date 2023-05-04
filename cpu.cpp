@@ -1,6 +1,7 @@
 #include "constants.h"
 #include "helpers.h"
 #include "cpu.h"
+#include "mmu.h"
 #include <iostream>
 #include <iomanip>
 
@@ -1806,7 +1807,7 @@ U32 CPU::reti() {
 
     ret();
 
-    IME = 1;
+    // IME = 1;
 
     // 16 T Cycles
     return 16;
@@ -2093,7 +2094,7 @@ U32 CPU::daa() {
 U32 CPU::di() {
 
 
-    IME = 0;
+    // IME = 0;
 
     // 4 T Cycles
     return 4;
@@ -2102,7 +2103,7 @@ U32 CPU::di() {
 U32 CPU::ei() {
     // std::cout << "Enable Interrupts\n";
     // Set IME on next instr
-    EI = true;
+    // EI = true;
 
     // 4 T Cycles FIXME add next instr cycles
     return 4;

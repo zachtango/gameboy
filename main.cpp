@@ -3,6 +3,7 @@
 #include <iostream>
 #include <SDL2/SDL.h>
 #include <chrono>
+#include "cartridge.h"
 #include "mmu.h"
 #include "ppu.h"
 #include "cpu.h"
@@ -34,20 +35,30 @@ int main() {
 
     for(auto s : v) {
         Joypad joypad;
+        Cartridge cartridge;
+        Interrupts interrupts;
+        PPU ppu = PPU(interrupts);
+        Timer timer = Timer(interrupts);
 
-        MMU mmu = MMU(&joypad);
+        MMU mmu = MMU(
+            cartridge,
+            ppu,
+            timer,
+            joypad,
+            interrupts
+        );
 
-        mmu.load_rom(("../gb-test-roms/cpu_instrs/individual/" + s).c_str());
-
-        PPU ppu = PPU(mmu);
-        bool running = true;
-        // Loop through different textures and render them to the screen
-        // ppu.init_logo();
         CPU cpu = CPU(mmu);
-        Timer timer = Timer(mmu);
+        
+        cartridge.load_rom(("../gb-test-roms/cpu_instrs/individual/" + s).c_str());
 
         int i = 0;
-        
+
+        while(i < 10000) {
+            cpu.fetch_decode_execute();
+            i += 1;
+        }
+
     }
 
     return 0;

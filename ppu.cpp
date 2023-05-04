@@ -111,10 +111,10 @@ void PPU::oam_scan() {
         BYTE h = get_bit(control, 2) ? 16 : 8;
 
         // y = position of top of Sprite + 16
-        BYTE y = mmu.read(address);
+        BYTE y = read(address);
         
         // x = postiion of left of Sprite + 8
-        BYTE x = mmu.read(address + 1);
+        BYTE x = read(address + 1);
         
         // position_y of Sprite = y - 16
         // validate Sprite
@@ -151,9 +151,8 @@ void PPU::pixel_transfer() {
 
     // https://gbdev.io/pandocs/STAT.html#ff41--stat-lcd-status
     // if H Blank source interrupt (bit 3 of status), send STAT interrupt
-    if(get_bit(status, 3)) 1;
-        // FIXME add interrupt / interface
-        // interrupts.request(H Blank)
+    if(get_bit(status, 3))
+        interrupts.request_interrupt(LCD_STAT_INTERRUPT);
 
     // switch mode to H Blank by setting lower 2 bits of lcd status
     SET_PPU_MODE(ppu_mode::h_blank)
@@ -181,12 +180,12 @@ void PPU::h_blank() {
         SET_PPU_MODE(ppu_mode::v_blank)
 
         // send v blank interrupt
-        // FIXME send v blank interrupt
+        interrupts.request_interrupt(VBLANK_INTERRUPT);
 
         // https://gbdev.io/pandocs/STAT.html#ff41--stat-lcd-status
         // if V Blank source interrupt (bit 4 of status), send STAT interrupt
         if(get_bit(control, 4))
-            // FIXME add interrupt / interface
+            interrupts.request_interrupt(LCD_STAT_INTERRUPT);
         
         return;
     }
@@ -247,9 +246,8 @@ void PPU::increment_ly() {
     status = set_bit(status, 2, lyc == ly);
 
     // check LYC=LY STAT interrupt source
-    if(get_bit(status, 6)) {
-        // FIXME send STAT interrupt
-    }
+    if(get_bit(status, 6))
+        interrupts.request_interrupt(LCD_STAT_INTERRUPT);
 }
 
 void PPU::write_line() {
@@ -279,13 +277,13 @@ void PPU::write_line() {
         while(j < 160) {
             int tile_pixel = ((scx + j) % 256);
             U32 offset = (scy + ly) % 8;
-            BYTE tile_number = mmu.read(bg_tile_map_start + tile_pixel / 8);
+            BYTE tile_number = read(bg_tile_map_start + tile_pixel / 8);
             WORD tile_address;
 
             if(window_visible && ly >= wy && (j + 7) >= wx) {
                 // window nums
                 tile_pixel = (j + 7 - wx);
-                tile_number = mmu.read(window_tile_map_start + tile_pixel / 8);
+                tile_number = read(window_tile_map_start + tile_pixel / 8);
                 offset = (window_ly % 8) * 2;
             }
 
@@ -294,8 +292,8 @@ void PPU::write_line() {
                 tile_address = tile_address_start + tile_number * 16 + ((scy + ly) % 8) * 2; // tile_address_start + tile_number * 16 bits / tiles + (scy + ly) % 8 * 2 bits (individual lines of tile offset)
             }
 
-            BYTE line_lsb = mmu.read(tile_address);
-            BYTE line_msb = mmu.read(tile_address + 1);
+            BYTE line_lsb = read(tile_address);
+            BYTE line_msb = read(tile_address + 1);
 
             for(int p = tile_pixel % 8; p < 8; p++) {
                 if(j >= 160) {
@@ -318,10 +316,10 @@ void PPU::write_line() {
             if(address == 0)
                 break;
 
-            BYTE y = mmu.read(address),
-                x = mmu.read(address + 1),
-                tile_index = mmu.read(address + 2),
-                flags = mmu.read(address + 3);
+            BYTE y = read(address),
+                x = read(address + 1),
+                tile_index = read(address + 2),
+                flags = read(address + 3);
             
             if(x == 0 || x >= 168)
                 continue;
@@ -336,8 +334,8 @@ void PPU::write_line() {
                 offset = h - offset - 1;
             }
 
-            BYTE line_lsb = mmu.read(0x8000 + tile_index * 16 + offset * 2);
-            BYTE line_msb = mmu.read(0x8000 + tile_index * 16 + offset * 2 + 1);
+            BYTE line_lsb = read(0x8000 + tile_index * 16 + offset * 2);
+            BYTE line_msb = read(0x8000 + tile_index * 16 + offset * 2 + 1);
 
             for(int p = 0; p < 8; p++) {
                 if(x + p < 8 || x + p >= 168)
