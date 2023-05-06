@@ -1,6 +1,6 @@
 #include "cartridge.h"
 #include <fstream>
-#include <iostream>
+
 
 static char *rom_type[0x100] {
     [0x00] = "ROM ONLY",
@@ -39,6 +39,7 @@ void Cartridge::load_rom(const char file_name[]) {
     std::ifstream file(file_name, std::ios::binary);
 
     if(!file.is_open()) {
+        std::cerr << "Error opening ROM file\n";
         throw "Error opening ROM file";
     }
 
@@ -87,6 +88,8 @@ void Cartridge::load_rom(const char file_name[]) {
 /* MEMORY FUNCTIONS */
 BYTE Cartridge::read(WORD address) {
     BYTE *p = memory_map(address);
+
+    // std::cout << (int) address << ' ' << (int) *p << '\n';
     return *p;
 }
 
@@ -99,17 +102,21 @@ void Cartridge::write(WORD address, BYTE value) {
     Return pointer to the BYTE in memory the address refers to
 */
 BYTE* Cartridge::memory_map(WORD address) {
+
     // 0x0000 - 0x3FFF
     if(0x0000 <= address && address <= 0x3FFF)
         return &bank0[address];
+        // return &bank0[address];
     
     // 0x4000 - 0x7FFF
     if(0x4000 <= address && address <= 0x7FFF)
-        return &bank1[address - 0x4000];
+        return &bank0[address];
+        // return &bank1[address - 0x4000];
 
     // 0xA000 - 0xBFFF
     if(0xA000 <= address && address <= 0xBFFF)
         return &external_ram[address - 0xA000];
 
+    std::cerr << std::hex << address << " Address not in Cartridge range\n";
     throw "Address not in Cartridge range";
 }

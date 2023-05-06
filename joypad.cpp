@@ -7,30 +7,39 @@
 void Joypad::key_action(U32 key, bool pressed) {
     switch(key) {
         case START_INPUT:
+            std::cout << "start pressed\n";
             start = pressed;
             break;
         case SELECT_INPUT:
+            std::cout << "select pressed\n";
             select = pressed;
             break;
         case B_INPUT:
+            std::cout << "b pressed\n";
             b = pressed;
             break;
         case A_INPUT:
+            std::cout << "a pressed\n";
             a = pressed;
             break;
         case DOWN_INPUT:
+            std::cout << "down pressed\n";
             down = pressed;
             break;
         case UP_INPUT:
+            std::cout << "up pressed\n";
             up = pressed;
             break;
         case LEFT_INPUT:
+            std::cout << "left pressed\n";
             left = pressed;
             break;
         case RIGHT_INPUT:
+            std::cout << "right pressed\n";
             right = pressed;
             break;
         default:
+            std::cerr << "Action on unknown key\n";
             throw "Action on unknown key";
     }
 }
@@ -40,19 +49,20 @@ BYTE Joypad::read(WORD address) {
     // lower 4 bits of register
     BYTE lo = 0;
 
-    if(select_action) {
+    // if(select_action) {
+    //     lo = (
+    //         (start << 3) |
+    //         (select << 2) |
+    //         (b << 1) |
+    //         (a)
+    //     );
+    // } else 
+    if(select_direction) {
         lo = (
             (down << 3) |
             (up << 2) |
             (left << 1) |
             (right)
-        );
-    } else if(select_direction) {
-        lo = (
-            (start << 3) |
-            (up << 2) |
-            (b << 1) |
-            (a)
         );
     }
 
@@ -68,6 +78,7 @@ BYTE Joypad::read(WORD address) {
         );
     }
     
+    std::cerr << std::hex << address << " Address not in Joypad range\n";
     throw "Address not in Joypad range";
 }
 
@@ -79,7 +90,10 @@ void Joypad::write(WORD address, BYTE value) {
         select_action = !get_bit(value, 5);
         // bit 4
         select_direction = !get_bit(value, 4);
+        
+        return;
     }
 
+    std::cerr << std::hex << address << " Address not in Joypad range\n";
     throw "Address not in Joypad range";
 }

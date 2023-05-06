@@ -44,6 +44,9 @@ void Timer::tick() {
             interrupts.request_interrupt(TIMER_INTERRUPT);
         }
     }
+
+    // update last_cycle to this_cycle for next tick
+    last_cycle = this_cycle;
 }
 
 
@@ -89,5 +92,6 @@ BYTE* Timer::memory_map(WORD address) {
             return &tac;
     }
 
+    std::cerr << std::hex << address << " Address not in Timer range\n";
     throw "Address not in Timer range";
 }

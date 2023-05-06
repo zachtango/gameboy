@@ -1,5 +1,5 @@
 #include "helpers.h"
-#include <iostream>
+
 BYTE msb(WORD w) {
     return (w >> 8u) & 0x00FF;
 }

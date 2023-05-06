@@ -6,6 +6,7 @@
 #include "helpers.h"
 #include "interrupts.h"
 
+
 class Interrupts;
 
 typedef enum ppu_mode {
@@ -17,9 +18,14 @@ typedef enum ppu_mode {
 
 class PPU {
 public:
+    // Clear lower 2 bits of status and OR the mode
+    #define SET_PPU_MODE(mode) { status = (status & 0xFC) | mode; }
+
     PPU(Interrupts &interrupts) : interrupts(interrupts) {
         // initialize PPU state
-        mode = ppu_mode::oam_scan;
+        SET_PPU_MODE(ppu_mode::oam_scan)
+
+        previous_stat_on = false;
         ly = 0;
         window_ly = 0;
         scy = 0;
@@ -30,6 +36,8 @@ public:
         for(int i = 0; i < 144; i++)
             for(int j = 0; j < 160; j++)
                 video[i][j] = 0;
+
+        std::cout << "PPU INITALIZED\n";
     }
 
     /* TICK MASTER LOOP */
@@ -44,6 +52,9 @@ public:
     WORD tiles[192][128];
 
 private:
+    // holds whether STAT was on last check
+    bool previous_stat_on;
+
     /* TICK COUNTER */
     U32 ticks;
 
@@ -57,13 +68,13 @@ private:
     void v_blank();
 
     /* PPU MODE HELPERS */
+    bool is_stat_on();
+    bool is_window_visible();
     void write_line();
     void increment_ly();
     
     // For sending VBLANK and LCD_STAT interrupts
     Interrupts &interrupts;
-
-    ppu_mode mode;
 
     /* RENDERING */
     const WORD color[4] {
@@ -91,9 +102,9 @@ private:
 
     // 0x8000 - 0x9FFF
     BYTE vram[0x2000];
-    
+        
     // 0xFE00 - 0xFE9F
-    BYTE oam[0xA0];
+    BYTE oam[0x00A0];
 
     // LCD Registers (0xFF40 - 0xFF4B)
         // control
@@ -114,10 +125,6 @@ private:
         BYTE bg_palette; // 0xFF47
         BYTE obj_palette0; // 0xFF48
         BYTE obj_palette1; // 0xFF49
-
-
-    // Clear lower 2 bits of status and OR the mode
-    #define SET_PPU_MODE(mode) { status = (status & 0xFC) | mode; }
 };
 
 #endif

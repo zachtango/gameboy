@@ -1,6 +1,6 @@
 #ifndef MMU_H
 #define MMU_H
-#include <iostream>
+
 #include "constants.h"
 
 class Cartridge;
@@ -21,7 +21,10 @@ public:
         ppu(ppu),
         timer(timer),
         interrupts(interrupts),
-        joypad(joypad) {}
+        joypad(joypad) {
+
+        std::cout << "MMU INITIALIZED\n";
+    }
 
     /* MEMORY FUNCTIONS */
     BYTE read(WORD address);
@@ -35,6 +38,7 @@ private:
     Interrupts &interrupts;
 
     /* UNIMPLEMENTED IO REGISTERS */
+    // 0xFF00 - 0xFF7F (some implemented)
     BYTE io_registers[0x0080];
 
     /* INTERNAL RAM */

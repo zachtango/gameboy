@@ -18,7 +18,7 @@ public:
 
         interrupt_enable = 0;
         interrupt_flag = 0;
-        interrupt_master_enable = 0;
+        std::cout << "INTERRUPTS INITIALIZED\n";
     }
 
     U32 handle_interrupt(CPU &cpu);
@@ -45,10 +45,6 @@ private:
         Same bits as Interrupt enable
     */
     BYTE interrupt_flag;
-
-    // 0 Disable all interupts
-    // 1 Enable all interrupts enabled in IE register 0xFFFF
-    bool interrupt_master_enable;
 };
 
 

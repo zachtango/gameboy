@@ -1,5 +1,5 @@
 #include <fstream>
-#include <iostream>
+
 
 #include "helpers.h"
 #include "mmu.h"
@@ -10,6 +10,7 @@
 #include "interrupts.h"
 
 BYTE MMU::read(WORD address) {
+    // std::cout << "read: " << (int) address << '\n';
     // MEMORY MAP
     // https://gbdev.io/pandocs/Memory_Map.html?highlight=wram#memory-map
 
@@ -60,9 +61,10 @@ BYTE MMU::read(WORD address) {
             0xFF47 - 0xFF49     PPU R/W
             0xFF4A - 0xFF4B     PPU R/W
         */
-        if(address == 0xFF00)
+        if(address == 0xFF00) {
+            
             return joypad.read(address);
-
+        }
         else if(0xFF04 <= address && address <= 0xFF07)
             return timer.read(address);
 
@@ -154,6 +156,7 @@ BYTE MMU::read(WORD address) {
 }
 
 void MMU::write(WORD address, BYTE value) {
+    
     // MEMORY MAP
     // https://gbdev.io/pandocs/Memory_Map.html?highlight=wram#memory-map
 

@@ -6,7 +6,10 @@
 class Cartridge {
 public:
     // FIXME HANDLE MBCs
-    
+    Cartridge() {
+        std::cout << "CARTRIDGE INITIALIZED\n";
+    }
+
     /* LOAD ROM */
     void load_rom(const char file_name[]);
 
@@ -21,7 +24,7 @@ private:
     // https://gbdev.io/pandocs/Memory_Map.html
     
     // 0x0000 - 0x3FFF
-    BYTE bank0[0x4000];
+    BYTE bank0[0xF000];
     
     // 0x4000 - 0x7FFF
     BYTE bank1[0x4000];

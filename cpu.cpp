@@ -2,8 +2,9 @@
 #include "helpers.h"
 #include "cpu.h"
 #include "mmu.h"
-#include <iostream>
+
 #include <iomanip>
+#include <string>
 
 #include <execinfo.h>
 
@@ -20,7 +21,7 @@ char* out_r16(U32 r16) {
 
 /* DEBUG FUNCTIONS */
 void CPU::print_registers() {
-    std::cout << std::hex << std::uppercase <<
+    log_file << std::hex << std::uppercase <<
         "A:" << std::setw(2) << std::setfill('0') << (int)(registers.read_8(A)) << ' ' <<
         "F:" << std::setw(2) << std::setfill('0') << (int)(registers.read_8(F)) << ' ' <<
         "B:" << std::setw(2) << std::setfill('0') << (int)(registers.read_8(B)) << ' ' <<
@@ -39,42 +40,60 @@ void CPU::print_registers() {
 
 /* MASTER SEQUENCE (returns number of cycles taken) */
 U32 CPU::fetch_decode_execute() {
+    
+    // set interrupt_master_enable to true next instruction after EI runs
+    // this allows next instruction to run in this fetch_decode_execute cycle
+    // then the cycle will exit with interrupt_master_enable on
+    if(enable_interrupt) {
+        interrupt_master_enable = true;
+        enable_interrupt = false;
+    }
 
     // fetch
     opcode = mmu.read(PC);
+
+    if(debug) {
+        if(!prefix_instruction) {
+            print_registers();
+            std::cout << std::hex << std::setw(2) << std::setfill('0') << (int) opcode << ": ";
+            std::cout << INSTRUCTION_NAME_MAP[opcode] << '\n';
+        } else {
+            std::cout << CB_INSTRUCTION_NAME_MAP[opcode] << '\n';
+        }
+    }
     
     PC += 1;
 
     // decode
-    cpu_instr f;
+    cpu_instruction cpu_function;
     
-    if(prefix) {
-        f = cb_instr[opcode];
-        prefix = false;
-    } else f = instr[opcode];
+    if(prefix_instruction) {
+        cpu_function = cb_instruction_map[opcode];
+        prefix_instruction = false;
+    } else {
+        cpu_function = instruction_map[opcode];
+    }
 
     U32 cycles;
 
     // execute
-    cycles = (this->*f)();
-
-    // backtrace_symbols_fd((void*const*) &f, 1, 1);
+    cycles = (this->*cpu_function)();
 
     return cycles;
 }
 
 /*
-    CPU INSTRUCTIONS
+    CPU instructions
     https://rgbds.gbdev.io/docs/v0.6.1/gbz80.7/
 */
 
 // Prefix
 U32 CPU::cb_prefix() {
-    prefix = true;
+    prefix_instruction = true;
     return 4;
 }
 
-// 8 bit Arithmetic and Logic Instructions
+// 8 bit Arithmetic and Logic instructions
 BYTE CPU::_add_8(BYTE a, BYTE b, bool carry) {
     // Z0HC
     if(carry)
@@ -195,7 +214,6 @@ void CPU::_add_A_r8(bool carry) {
     // Z0HC
 
     U32 r8 = _register_8(opcode & 0x07);
-    // std::cout << out_r8(r8) << '\n';
 
     BYTE sum = _add_8(
         registers.read_8(A),
@@ -641,7 +659,7 @@ U32 CPU::xor_A_mHL() {
     WORD hl = registers.read_16(HL);
 
     BYTE mHL = mmu.read(hl);
-
+    // std::cout << std::hex << std::setw(2) << std::setfill('0') << (int) mHL << '\n';
     BYTE x = _xor(
         registers.read_8(A),
         mHL
@@ -672,7 +690,7 @@ U32 CPU::xor_A_n8() {
     return 8;
 }
 
-// 16 bit Arithmetic Instructions
+// 16 bit Arithmetic instructions
 WORD CPU::_add_16(WORD a, WORD b) {
     // -0HC
 
@@ -728,7 +746,7 @@ U32 CPU::inc_r16() {
     return 8;
 }
 
-// Bit Operations Instructions
+// Bit Operations instructions
 void CPU::_bit(BYTE b, U32 n) {
     // Z01-
 
@@ -910,7 +928,7 @@ U32 CPU::swap_mHL() {
     return 16;
 }
 
-// Bit Shift Instructions
+// Bit Shift instructions
 BYTE CPU::_rl(BYTE b, bool through_carry) {
     // Z00C
 
@@ -1324,7 +1342,7 @@ U32 CPU::srl_mHL() {
     return 16;
 }
 
-// Load Instructions
+// Load instructions
 U32 CPU::ld_r8_r8(){
     
     U32 a_r8 = _register_8((opcode >> 3u) & 0x07);
@@ -1634,7 +1652,9 @@ bool CPU::_condition(U32 c) {
         case 3:
             return registers.get_c_flag();
     }
-    throw "Unknown condition";
+
+    std::cerr << "Unknown CPU condition\n";
+    throw "Unknown CPU condition";
 }
 
 void CPU::_call(WORD address) {
@@ -1815,7 +1835,6 @@ U32 CPU::reti() {
 
 U32 CPU::rst() {
 
-
     WORD vec = opcode & 0b00111000;
 
     _call(vec);
@@ -1824,7 +1843,7 @@ U32 CPU::rst() {
     return 16;
 }
 
-// Stack Operations Instructions
+// Stack Operations instructions
 U32 CPU::add_HL_SP() {
 
     // -0HC
@@ -2018,7 +2037,7 @@ U32 CPU::push_r16() {
 }
 
 
-// Miscellaneous Instructions
+// Miscellaneous instructions
 U32 CPU::ccf() {
 
     // -00C
@@ -2093,8 +2112,7 @@ U32 CPU::daa() {
 
 U32 CPU::di() {
 
-
-    // IME = 0;
+    interrupt_master_enable = false;
 
     // 4 T Cycles
     return 4;
@@ -2102,10 +2120,10 @@ U32 CPU::di() {
 
 U32 CPU::ei() {
     // std::cout << "Enable Interrupts\n";
-    // Set IME on next instr
-    // EI = true;
+    // Set IME on next instruction
+    enable_interrupt = true;
 
-    // 4 T Cycles FIXME add next instr cycles
+    // 4 T Cycles FIXME add next instruction cycles
     return 4;
 }
 
@@ -2148,548 +2166,548 @@ U32 CPU::stop() {
 }
 
 
-void CPU::init_instr_tables() {
-    instr[0x00] = &CPU::nop;
-    instr[0x01] = &CPU::ld_r16_n16;
-    instr[0x02] = &CPU::ld_mr16_A;
-    instr[0x03] = &CPU::inc_r16;
-    instr[0x04] = &CPU::inc_r8;
-    instr[0x05] = &CPU::dec_r8;
-    instr[0x06] = &CPU::ld_r8_n8;
-    instr[0x07] = &CPU::rlca;
-    instr[0x08] = &CPU::ld_mn16_SP;
-    instr[0x09] = &CPU::add_HL_r16;
-    instr[0x0A] = &CPU::ld_A_mr16;
-    instr[0x0B] = &CPU::dec_r16;
-    instr[0x0C] = &CPU::inc_r8;
-    instr[0x0D] = &CPU::dec_r8;
-    instr[0x0E] = &CPU::ld_r8_n8;
-    instr[0x0F] = &CPU::rrca;
+void CPU::init_instruction_tables() {
+    instruction_map[0x00] = &CPU::nop;
+    instruction_map[0x01] = &CPU::ld_r16_n16;
+    instruction_map[0x02] = &CPU::ld_mr16_A;
+    instruction_map[0x03] = &CPU::inc_r16;
+    instruction_map[0x04] = &CPU::inc_r8;
+    instruction_map[0x05] = &CPU::dec_r8;
+    instruction_map[0x06] = &CPU::ld_r8_n8;
+    instruction_map[0x07] = &CPU::rlca;
+    instruction_map[0x08] = &CPU::ld_mn16_SP;
+    instruction_map[0x09] = &CPU::add_HL_r16;
+    instruction_map[0x0A] = &CPU::ld_A_mr16;
+    instruction_map[0x0B] = &CPU::dec_r16;
+    instruction_map[0x0C] = &CPU::inc_r8;
+    instruction_map[0x0D] = &CPU::dec_r8;
+    instruction_map[0x0E] = &CPU::ld_r8_n8;
+    instruction_map[0x0F] = &CPU::rrca;
 
-    instr[0x10] = &CPU::stop;
-    instr[0x11] = &CPU::ld_r16_n16;
-    instr[0x12] = &CPU::ld_mr16_A;
-    instr[0x13] = &CPU::inc_r16;
-    instr[0x14] = &CPU::inc_r8;
-    instr[0x15] = &CPU::dec_r8;
-    instr[0x16] = &CPU::ld_r8_n8;
-    instr[0x17] = &CPU::rla;
-    instr[0x18] = &CPU::jr_n16;
-    instr[0x19] = &CPU::add_HL_r16;
-    instr[0x1A] = &CPU::ld_A_mr16;
-    instr[0x1B] = &CPU::dec_r16;
-    instr[0x1C] = &CPU::inc_r8;
-    instr[0x1D] = &CPU::dec_r8;
-    instr[0x1E] = &CPU::ld_r8_n8;
-    instr[0x1F] = &CPU::rra;
+    instruction_map[0x10] = &CPU::stop;
+    instruction_map[0x11] = &CPU::ld_r16_n16;
+    instruction_map[0x12] = &CPU::ld_mr16_A;
+    instruction_map[0x13] = &CPU::inc_r16;
+    instruction_map[0x14] = &CPU::inc_r8;
+    instruction_map[0x15] = &CPU::dec_r8;
+    instruction_map[0x16] = &CPU::ld_r8_n8;
+    instruction_map[0x17] = &CPU::rla;
+    instruction_map[0x18] = &CPU::jr_n16;
+    instruction_map[0x19] = &CPU::add_HL_r16;
+    instruction_map[0x1A] = &CPU::ld_A_mr16;
+    instruction_map[0x1B] = &CPU::dec_r16;
+    instruction_map[0x1C] = &CPU::inc_r8;
+    instruction_map[0x1D] = &CPU::dec_r8;
+    instruction_map[0x1E] = &CPU::ld_r8_n8;
+    instruction_map[0x1F] = &CPU::rra;
 
-    instr[0x20] = &CPU::jr_cc_n16;
-    instr[0x21] = &CPU::ld_r16_n16;
-    instr[0x22] = &CPU::ld_mHLI_A;
-    instr[0x23] = &CPU::inc_r16;
-    instr[0x24] = &CPU::inc_r8;
-    instr[0x25] = &CPU::dec_r8;
-    instr[0x26] = &CPU::ld_r8_n8;
-    instr[0x27] = &CPU::daa;
-    instr[0x28] = &CPU::jr_cc_n16;
-    instr[0x29] = &CPU::add_HL_r16;
-    instr[0x2A] = &CPU::ld_A_mHLI;
-    instr[0x2B] = &CPU::dec_r16;
-    instr[0x2C] = &CPU::inc_r8;
-    instr[0x2D] = &CPU::dec_r8;
-    instr[0x2E] = &CPU::ld_r8_n8;
-    instr[0x2F] = &CPU::cpl;
+    instruction_map[0x20] = &CPU::jr_cc_n16;
+    instruction_map[0x21] = &CPU::ld_r16_n16;
+    instruction_map[0x22] = &CPU::ld_mHLI_A;
+    instruction_map[0x23] = &CPU::inc_r16;
+    instruction_map[0x24] = &CPU::inc_r8;
+    instruction_map[0x25] = &CPU::dec_r8;
+    instruction_map[0x26] = &CPU::ld_r8_n8;
+    instruction_map[0x27] = &CPU::daa;
+    instruction_map[0x28] = &CPU::jr_cc_n16;
+    instruction_map[0x29] = &CPU::add_HL_r16;
+    instruction_map[0x2A] = &CPU::ld_A_mHLI;
+    instruction_map[0x2B] = &CPU::dec_r16;
+    instruction_map[0x2C] = &CPU::inc_r8;
+    instruction_map[0x2D] = &CPU::dec_r8;
+    instruction_map[0x2E] = &CPU::ld_r8_n8;
+    instruction_map[0x2F] = &CPU::cpl;
     
-    instr[0x30] = &CPU::jr_cc_n16;
-    instr[0x31] = &CPU::ld_SP_n16;
-    instr[0x32] = &CPU::ld_mHLD_A;
-    instr[0x33] = &CPU::inc_SP;
-    instr[0x34] = &CPU::inc_mHL;
-    instr[0x35] = &CPU::dec_mHL;
-    instr[0x36] = &CPU::ld_mHL_n8;
-    instr[0x37] = &CPU::scf;
-    instr[0x38] = &CPU::jr_cc_n16;
-    instr[0x39] = &CPU::add_HL_SP;
-    instr[0x3A] = &CPU::ld_A_mHLD;
-    instr[0x3B] = &CPU::dec_SP;
-    instr[0x3C] = &CPU::inc_r8;
-    instr[0x3D] = &CPU::dec_r8;
-    instr[0x3E] = &CPU::ld_r8_n8;
-    instr[0x3F] = &CPU::ccf;
+    instruction_map[0x30] = &CPU::jr_cc_n16;
+    instruction_map[0x31] = &CPU::ld_SP_n16;
+    instruction_map[0x32] = &CPU::ld_mHLD_A;
+    instruction_map[0x33] = &CPU::inc_SP;
+    instruction_map[0x34] = &CPU::inc_mHL;
+    instruction_map[0x35] = &CPU::dec_mHL;
+    instruction_map[0x36] = &CPU::ld_mHL_n8;
+    instruction_map[0x37] = &CPU::scf;
+    instruction_map[0x38] = &CPU::jr_cc_n16;
+    instruction_map[0x39] = &CPU::add_HL_SP;
+    instruction_map[0x3A] = &CPU::ld_A_mHLD;
+    instruction_map[0x3B] = &CPU::dec_SP;
+    instruction_map[0x3C] = &CPU::inc_r8;
+    instruction_map[0x3D] = &CPU::dec_r8;
+    instruction_map[0x3E] = &CPU::ld_r8_n8;
+    instruction_map[0x3F] = &CPU::ccf;
 
-    instr[0x40] = &CPU::ld_r8_r8;
-    instr[0x41] = &CPU::ld_r8_r8;
-    instr[0x42] = &CPU::ld_r8_r8;
-    instr[0x43] = &CPU::ld_r8_r8;
-    instr[0x44] = &CPU::ld_r8_r8;
-    instr[0x45] = &CPU::ld_r8_r8;
-    instr[0x46] = &CPU::ld_r8_mHL;
-    instr[0x47] = &CPU::ld_r8_r8;
-    instr[0x48] = &CPU::ld_r8_r8;
-    instr[0x49] = &CPU::ld_r8_r8;
-    instr[0x4A] = &CPU::ld_r8_r8;
-    instr[0x4B] = &CPU::ld_r8_r8;
-    instr[0x4C] = &CPU::ld_r8_r8;
-    instr[0x4D] = &CPU::ld_r8_r8;
-    instr[0x4E] = &CPU::ld_r8_mHL;
-    instr[0x4F] = &CPU::ld_r8_r8;
+    instruction_map[0x40] = &CPU::ld_r8_r8;
+    instruction_map[0x41] = &CPU::ld_r8_r8;
+    instruction_map[0x42] = &CPU::ld_r8_r8;
+    instruction_map[0x43] = &CPU::ld_r8_r8;
+    instruction_map[0x44] = &CPU::ld_r8_r8;
+    instruction_map[0x45] = &CPU::ld_r8_r8;
+    instruction_map[0x46] = &CPU::ld_r8_mHL;
+    instruction_map[0x47] = &CPU::ld_r8_r8;
+    instruction_map[0x48] = &CPU::ld_r8_r8;
+    instruction_map[0x49] = &CPU::ld_r8_r8;
+    instruction_map[0x4A] = &CPU::ld_r8_r8;
+    instruction_map[0x4B] = &CPU::ld_r8_r8;
+    instruction_map[0x4C] = &CPU::ld_r8_r8;
+    instruction_map[0x4D] = &CPU::ld_r8_r8;
+    instruction_map[0x4E] = &CPU::ld_r8_mHL;
+    instruction_map[0x4F] = &CPU::ld_r8_r8;
 
-    instr[0x50] = &CPU::ld_r8_r8;
-    instr[0x51] = &CPU::ld_r8_r8;
-    instr[0x52] = &CPU::ld_r8_r8;
-    instr[0x53] = &CPU::ld_r8_r8;
-    instr[0x54] = &CPU::ld_r8_r8;
-    instr[0x55] = &CPU::ld_r8_r8;
-    instr[0x56] = &CPU::ld_r8_mHL;
-    instr[0x57] = &CPU::ld_r8_r8;
-    instr[0x58] = &CPU::ld_r8_r8;
-    instr[0x59] = &CPU::ld_r8_r8;
-    instr[0x5A] = &CPU::ld_r8_r8;
-    instr[0x5B] = &CPU::ld_r8_r8;
-    instr[0x5C] = &CPU::ld_r8_r8;
-    instr[0x5D] = &CPU::ld_r8_r8;
-    instr[0x5E] = &CPU::ld_r8_mHL;
-    instr[0x5F] = &CPU::ld_r8_r8;
+    instruction_map[0x50] = &CPU::ld_r8_r8;
+    instruction_map[0x51] = &CPU::ld_r8_r8;
+    instruction_map[0x52] = &CPU::ld_r8_r8;
+    instruction_map[0x53] = &CPU::ld_r8_r8;
+    instruction_map[0x54] = &CPU::ld_r8_r8;
+    instruction_map[0x55] = &CPU::ld_r8_r8;
+    instruction_map[0x56] = &CPU::ld_r8_mHL;
+    instruction_map[0x57] = &CPU::ld_r8_r8;
+    instruction_map[0x58] = &CPU::ld_r8_r8;
+    instruction_map[0x59] = &CPU::ld_r8_r8;
+    instruction_map[0x5A] = &CPU::ld_r8_r8;
+    instruction_map[0x5B] = &CPU::ld_r8_r8;
+    instruction_map[0x5C] = &CPU::ld_r8_r8;
+    instruction_map[0x5D] = &CPU::ld_r8_r8;
+    instruction_map[0x5E] = &CPU::ld_r8_mHL;
+    instruction_map[0x5F] = &CPU::ld_r8_r8;
 
-    instr[0x60] = &CPU::ld_r8_r8;
-    instr[0x61] = &CPU::ld_r8_r8;
-    instr[0x62] = &CPU::ld_r8_r8;
-    instr[0x63] = &CPU::ld_r8_r8;
-    instr[0x64] = &CPU::ld_r8_r8;
-    instr[0x65] = &CPU::ld_r8_r8;
-    instr[0x66] = &CPU::ld_r8_mHL;
-    instr[0x67] = &CPU::ld_r8_r8;
-    instr[0x68] = &CPU::ld_r8_r8;
-    instr[0x69] = &CPU::ld_r8_r8;
-    instr[0x6A] = &CPU::ld_r8_r8;
-    instr[0x6B] = &CPU::ld_r8_r8;
-    instr[0x6C] = &CPU::ld_r8_r8;
-    instr[0x6D] = &CPU::ld_r8_r8;
-    instr[0x6E] = &CPU::ld_r8_mHL;
-    instr[0x6F] = &CPU::ld_r8_r8;
+    instruction_map[0x60] = &CPU::ld_r8_r8;
+    instruction_map[0x61] = &CPU::ld_r8_r8;
+    instruction_map[0x62] = &CPU::ld_r8_r8;
+    instruction_map[0x63] = &CPU::ld_r8_r8;
+    instruction_map[0x64] = &CPU::ld_r8_r8;
+    instruction_map[0x65] = &CPU::ld_r8_r8;
+    instruction_map[0x66] = &CPU::ld_r8_mHL;
+    instruction_map[0x67] = &CPU::ld_r8_r8;
+    instruction_map[0x68] = &CPU::ld_r8_r8;
+    instruction_map[0x69] = &CPU::ld_r8_r8;
+    instruction_map[0x6A] = &CPU::ld_r8_r8;
+    instruction_map[0x6B] = &CPU::ld_r8_r8;
+    instruction_map[0x6C] = &CPU::ld_r8_r8;
+    instruction_map[0x6D] = &CPU::ld_r8_r8;
+    instruction_map[0x6E] = &CPU::ld_r8_mHL;
+    instruction_map[0x6F] = &CPU::ld_r8_r8;
 
-    instr[0x70] = &CPU::ld_mHL_r8;
-    instr[0x71] = &CPU::ld_mHL_r8;
-    instr[0x72] = &CPU::ld_mHL_r8;
-    instr[0x73] = &CPU::ld_mHL_r8;
-    instr[0x74] = &CPU::ld_mHL_r8;
-    instr[0x75] = &CPU::ld_mHL_r8;
-    instr[0x76] = &CPU::halt;
-    instr[0x77] = &CPU::ld_mHL_r8;
-    instr[0x78] = &CPU::ld_r8_r8;
-    instr[0x79] = &CPU::ld_r8_r8;
-    instr[0x7A] = &CPU::ld_r8_r8;
-    instr[0x7B] = &CPU::ld_r8_r8;
-    instr[0x7C] = &CPU::ld_r8_r8;
-    instr[0x7D] = &CPU::ld_r8_r8;
-    instr[0x7E] = &CPU::ld_r8_mHL;
-    instr[0x7F] = &CPU::ld_r8_r8;
+    instruction_map[0x70] = &CPU::ld_mHL_r8;
+    instruction_map[0x71] = &CPU::ld_mHL_r8;
+    instruction_map[0x72] = &CPU::ld_mHL_r8;
+    instruction_map[0x73] = &CPU::ld_mHL_r8;
+    instruction_map[0x74] = &CPU::ld_mHL_r8;
+    instruction_map[0x75] = &CPU::ld_mHL_r8;
+    instruction_map[0x76] = &CPU::halt;
+    instruction_map[0x77] = &CPU::ld_mHL_r8;
+    instruction_map[0x78] = &CPU::ld_r8_r8;
+    instruction_map[0x79] = &CPU::ld_r8_r8;
+    instruction_map[0x7A] = &CPU::ld_r8_r8;
+    instruction_map[0x7B] = &CPU::ld_r8_r8;
+    instruction_map[0x7C] = &CPU::ld_r8_r8;
+    instruction_map[0x7D] = &CPU::ld_r8_r8;
+    instruction_map[0x7E] = &CPU::ld_r8_mHL;
+    instruction_map[0x7F] = &CPU::ld_r8_r8;
 
-    instr[0x80] = &CPU::add_A_r8;
-    instr[0x81] = &CPU::add_A_r8;
-    instr[0x82] = &CPU::add_A_r8;
-    instr[0x83] = &CPU::add_A_r8;
-    instr[0x84] = &CPU::add_A_r8;
-    instr[0x85] = &CPU::add_A_r8;
-    instr[0x86] = &CPU::add_A_mHL;
-    instr[0x87] = &CPU::add_A_r8;
-    instr[0x88] = &CPU::adc_A_r8;
-    instr[0x89] = &CPU::adc_A_r8;
-    instr[0x8A] = &CPU::adc_A_r8;
-    instr[0x8B] = &CPU::adc_A_r8;
-    instr[0x8C] = &CPU::adc_A_r8;
-    instr[0x8D] = &CPU::adc_A_r8;
-    instr[0x8E] = &CPU::adc_A_mHL;
-    instr[0x8F] = &CPU::adc_A_r8;
+    instruction_map[0x80] = &CPU::add_A_r8;
+    instruction_map[0x81] = &CPU::add_A_r8;
+    instruction_map[0x82] = &CPU::add_A_r8;
+    instruction_map[0x83] = &CPU::add_A_r8;
+    instruction_map[0x84] = &CPU::add_A_r8;
+    instruction_map[0x85] = &CPU::add_A_r8;
+    instruction_map[0x86] = &CPU::add_A_mHL;
+    instruction_map[0x87] = &CPU::add_A_r8;
+    instruction_map[0x88] = &CPU::adc_A_r8;
+    instruction_map[0x89] = &CPU::adc_A_r8;
+    instruction_map[0x8A] = &CPU::adc_A_r8;
+    instruction_map[0x8B] = &CPU::adc_A_r8;
+    instruction_map[0x8C] = &CPU::adc_A_r8;
+    instruction_map[0x8D] = &CPU::adc_A_r8;
+    instruction_map[0x8E] = &CPU::adc_A_mHL;
+    instruction_map[0x8F] = &CPU::adc_A_r8;
 
-    instr[0x90] = &CPU::sub_A_r8;
-    instr[0x91] = &CPU::sub_A_r8;
-    instr[0x92] = &CPU::sub_A_r8;
-    instr[0x93] = &CPU::sub_A_r8;
-    instr[0x94] = &CPU::sub_A_r8;
-    instr[0x95] = &CPU::sub_A_r8;
-    instr[0x96] = &CPU::sub_A_mHL;
-    instr[0x97] = &CPU::sub_A_r8;
-    instr[0x98] = &CPU::sbc_A_r8;
-    instr[0x99] = &CPU::sbc_A_r8;
-    instr[0x9A] = &CPU::sbc_A_r8;
-    instr[0x9B] = &CPU::sbc_A_r8;
-    instr[0x9C] = &CPU::sbc_A_r8;
-    instr[0x9D] = &CPU::sbc_A_r8;
-    instr[0x9E] = &CPU::sbc_A_mHL;
-    instr[0x9F] = &CPU::sbc_A_r8;
+    instruction_map[0x90] = &CPU::sub_A_r8;
+    instruction_map[0x91] = &CPU::sub_A_r8;
+    instruction_map[0x92] = &CPU::sub_A_r8;
+    instruction_map[0x93] = &CPU::sub_A_r8;
+    instruction_map[0x94] = &CPU::sub_A_r8;
+    instruction_map[0x95] = &CPU::sub_A_r8;
+    instruction_map[0x96] = &CPU::sub_A_mHL;
+    instruction_map[0x97] = &CPU::sub_A_r8;
+    instruction_map[0x98] = &CPU::sbc_A_r8;
+    instruction_map[0x99] = &CPU::sbc_A_r8;
+    instruction_map[0x9A] = &CPU::sbc_A_r8;
+    instruction_map[0x9B] = &CPU::sbc_A_r8;
+    instruction_map[0x9C] = &CPU::sbc_A_r8;
+    instruction_map[0x9D] = &CPU::sbc_A_r8;
+    instruction_map[0x9E] = &CPU::sbc_A_mHL;
+    instruction_map[0x9F] = &CPU::sbc_A_r8;
 
-    instr[0xA0] = &CPU::and_A_r8;
-    instr[0xA1] = &CPU::and_A_r8;
-    instr[0xA2] = &CPU::and_A_r8;
-    instr[0xA3] = &CPU::and_A_r8;
-    instr[0xA4] = &CPU::and_A_r8;
-    instr[0xA5] = &CPU::and_A_r8;
-    instr[0xA6] = &CPU::and_A_mHL;
-    instr[0xA7] = &CPU::and_A_r8;
-    instr[0xA8] = &CPU::xor_A_r8;
-    instr[0xA9] = &CPU::xor_A_r8;
-    instr[0xAA] = &CPU::xor_A_r8;
-    instr[0xAB] = &CPU::xor_A_r8;
-    instr[0xAC] = &CPU::xor_A_r8;
-    instr[0xAD] = &CPU::xor_A_r8;
-    instr[0xAE] = &CPU::xor_A_mHL;
-    instr[0xAF] = &CPU::xor_A_r8;
+    instruction_map[0xA0] = &CPU::and_A_r8;
+    instruction_map[0xA1] = &CPU::and_A_r8;
+    instruction_map[0xA2] = &CPU::and_A_r8;
+    instruction_map[0xA3] = &CPU::and_A_r8;
+    instruction_map[0xA4] = &CPU::and_A_r8;
+    instruction_map[0xA5] = &CPU::and_A_r8;
+    instruction_map[0xA6] = &CPU::and_A_mHL;
+    instruction_map[0xA7] = &CPU::and_A_r8;
+    instruction_map[0xA8] = &CPU::xor_A_r8;
+    instruction_map[0xA9] = &CPU::xor_A_r8;
+    instruction_map[0xAA] = &CPU::xor_A_r8;
+    instruction_map[0xAB] = &CPU::xor_A_r8;
+    instruction_map[0xAC] = &CPU::xor_A_r8;
+    instruction_map[0xAD] = &CPU::xor_A_r8;
+    instruction_map[0xAE] = &CPU::xor_A_mHL;
+    instruction_map[0xAF] = &CPU::xor_A_r8;
 
-    instr[0xB0] = &CPU::or_A_r8;
-    instr[0xB1] = &CPU::or_A_r8;
-    instr[0xB2] = &CPU::or_A_r8;
-    instr[0xB3] = &CPU::or_A_r8;
-    instr[0xB4] = &CPU::or_A_r8;
-    instr[0xB5] = &CPU::or_A_r8;
-    instr[0xB6] = &CPU::or_A_mHL;
-    instr[0xB7] = &CPU::or_A_r8;
-    instr[0xB8] = &CPU::cp_A_r8;
-    instr[0xB9] = &CPU::cp_A_r8;
-    instr[0xBA] = &CPU::cp_A_r8;
-    instr[0xBB] = &CPU::cp_A_r8;
-    instr[0xBC] = &CPU::cp_A_r8;
-    instr[0xBD] = &CPU::cp_A_r8;
-    instr[0xBE] = &CPU::cp_A_mHL;
-    instr[0xBF] = &CPU::cp_A_r8;
+    instruction_map[0xB0] = &CPU::or_A_r8;
+    instruction_map[0xB1] = &CPU::or_A_r8;
+    instruction_map[0xB2] = &CPU::or_A_r8;
+    instruction_map[0xB3] = &CPU::or_A_r8;
+    instruction_map[0xB4] = &CPU::or_A_r8;
+    instruction_map[0xB5] = &CPU::or_A_r8;
+    instruction_map[0xB6] = &CPU::or_A_mHL;
+    instruction_map[0xB7] = &CPU::or_A_r8;
+    instruction_map[0xB8] = &CPU::cp_A_r8;
+    instruction_map[0xB9] = &CPU::cp_A_r8;
+    instruction_map[0xBA] = &CPU::cp_A_r8;
+    instruction_map[0xBB] = &CPU::cp_A_r8;
+    instruction_map[0xBC] = &CPU::cp_A_r8;
+    instruction_map[0xBD] = &CPU::cp_A_r8;
+    instruction_map[0xBE] = &CPU::cp_A_mHL;
+    instruction_map[0xBF] = &CPU::cp_A_r8;
 
-    instr[0xC0] = &CPU::ret_cc;
-    instr[0xC1] = &CPU::pop_r16;
-    instr[0xC2] = &CPU::jp_cc_n16;
-    instr[0xC3] = &CPU::jp_n16;
-    instr[0xC4] = &CPU::call_cc_n16;
-    instr[0xC5] = &CPU::push_r16;
-    instr[0xC6] = &CPU::add_A_n8;
-    instr[0xC7] = &CPU::rst;
-    instr[0xC8] = &CPU::ret_cc;
-    instr[0xC9] = &CPU::ret;
-    instr[0xCA] = &CPU::jp_cc_n16;
-    instr[0xCB] = &CPU::cb_prefix;
-    instr[0xCC] = &CPU::call_cc_n16;
-    instr[0xCD] = &CPU::call_n16;
-    instr[0xCE] = &CPU::adc_A_n8;
-    instr[0xCF] = &CPU::rst;
+    instruction_map[0xC0] = &CPU::ret_cc;
+    instruction_map[0xC1] = &CPU::pop_r16;
+    instruction_map[0xC2] = &CPU::jp_cc_n16;
+    instruction_map[0xC3] = &CPU::jp_n16;
+    instruction_map[0xC4] = &CPU::call_cc_n16;
+    instruction_map[0xC5] = &CPU::push_r16;
+    instruction_map[0xC6] = &CPU::add_A_n8;
+    instruction_map[0xC7] = &CPU::rst;
+    instruction_map[0xC8] = &CPU::ret_cc;
+    instruction_map[0xC9] = &CPU::ret;
+    instruction_map[0xCA] = &CPU::jp_cc_n16;
+    instruction_map[0xCB] = &CPU::cb_prefix;
+    instruction_map[0xCC] = &CPU::call_cc_n16;
+    instruction_map[0xCD] = &CPU::call_n16;
+    instruction_map[0xCE] = &CPU::adc_A_n8;
+    instruction_map[0xCF] = &CPU::rst;
 
-    instr[0xD0] = &CPU::ret_cc;
-    instr[0xD1] = &CPU::pop_r16;
-    instr[0xD2] = &CPU::jp_cc_n16;
-    // instr[0xD3] ILLEGAL
-    instr[0xD4] = &CPU::call_cc_n16;
-    instr[0xD5] = &CPU::push_r16;
-    instr[0xD6] = &CPU::sub_A_n8;
-    instr[0xD7] = &CPU::rst;
-    instr[0xD8] = &CPU::ret_cc;
-    instr[0xD9] = &CPU::reti;
-    instr[0xDA] = &CPU::jp_cc_n16;
-    // instr[0xDB] ILLEGAL
-    instr[0xDC] = &CPU::call_cc_n16;
-    // instr[0xDD] ILLEGAL
-    instr[0xDE] = &CPU::sbc_A_n8;
-    instr[0xDF] = &CPU::rst;
+    instruction_map[0xD0] = &CPU::ret_cc;
+    instruction_map[0xD1] = &CPU::pop_r16;
+    instruction_map[0xD2] = &CPU::jp_cc_n16;
+    // instruction_map[0xD3] ILLEGAL
+    instruction_map[0xD4] = &CPU::call_cc_n16;
+    instruction_map[0xD5] = &CPU::push_r16;
+    instruction_map[0xD6] = &CPU::sub_A_n8;
+    instruction_map[0xD7] = &CPU::rst;
+    instruction_map[0xD8] = &CPU::ret_cc;
+    instruction_map[0xD9] = &CPU::reti;
+    instruction_map[0xDA] = &CPU::jp_cc_n16;
+    // instruction_map[0xDB] ILLEGAL
+    instruction_map[0xDC] = &CPU::call_cc_n16;
+    // instruction_map[0xDD] ILLEGAL
+    instruction_map[0xDE] = &CPU::sbc_A_n8;
+    instruction_map[0xDF] = &CPU::rst;
 
-    instr[0xE0] = &CPU::ldh_mn16_A;
-    instr[0xE1] = &CPU::pop_r16;
-    instr[0xE2] = &CPU::ldh_mC_A;
-    // instr[0xE3] ILLEGAL
-    // instr[0xE4] ILLEGAL
-    instr[0xE5] = &CPU::push_r16;
-    instr[0xE6] = &CPU::and_A_n8;
-    instr[0xE7] = &CPU::rst;
-    instr[0xE8] = &CPU::add_SP_e8;
-    instr[0xE9] = &CPU::jp_HL;
-    instr[0xEA] = &CPU::ld_mn16_A;
-    // instr[0xEB] ILLEGAL
-    // instr[0xEC] ILLEGAL
-    // instr[0xED] ILLEGAL
-    instr[0xEE] = &CPU::xor_A_n8;
-    instr[0xEF] = &CPU::rst;
+    instruction_map[0xE0] = &CPU::ldh_mn16_A;
+    instruction_map[0xE1] = &CPU::pop_r16;
+    instruction_map[0xE2] = &CPU::ldh_mC_A;
+    // instruction_map[0xE3] ILLEGAL
+    // instruction_map[0xE4] ILLEGAL
+    instruction_map[0xE5] = &CPU::push_r16;
+    instruction_map[0xE6] = &CPU::and_A_n8;
+    instruction_map[0xE7] = &CPU::rst;
+    instruction_map[0xE8] = &CPU::add_SP_e8;
+    instruction_map[0xE9] = &CPU::jp_HL;
+    instruction_map[0xEA] = &CPU::ld_mn16_A;
+    // instruction_map[0xEB] ILLEGAL
+    // instruction_map[0xEC] ILLEGAL
+    // instruction_map[0xED] ILLEGAL
+    instruction_map[0xEE] = &CPU::xor_A_n8;
+    instruction_map[0xEF] = &CPU::rst;
 
-    instr[0xF0] = &CPU::ldh_A_mn16;
-    instr[0xF1] = &CPU::pop_AF;
-    instr[0xF2] = &CPU::ldh_A_mC;
-    instr[0xF3] = &CPU::di;
-    // instr[0xF4] ILLEGAL
-    instr[0xF5] = &CPU::push_r16;
-    instr[0xF6] = &CPU::or_A_n8;
-    instr[0xF7] = &CPU::rst;
-    instr[0xF8] = &CPU::ld_HL_SPe8;
-    instr[0xF9] = &CPU::ld_SP_HL;
-    instr[0xFA] = &CPU::ld_A_mn16;
-    instr[0xFB] = &CPU::ei;
-    // instr[0xFC] ILLEGAL
-    // instr[0xFD] ILLEGAL
-    instr[0xFE] = &CPU::cp_A_n8;
-    instr[0xFF] = &CPU::rst;
+    instruction_map[0xF0] = &CPU::ldh_A_mn16;
+    instruction_map[0xF1] = &CPU::pop_AF;
+    instruction_map[0xF2] = &CPU::ldh_A_mC;
+    instruction_map[0xF3] = &CPU::di;
+    // instruction_map[0xF4] ILLEGAL
+    instruction_map[0xF5] = &CPU::push_r16;
+    instruction_map[0xF6] = &CPU::or_A_n8;
+    instruction_map[0xF7] = &CPU::rst;
+    instruction_map[0xF8] = &CPU::ld_HL_SPe8;
+    instruction_map[0xF9] = &CPU::ld_SP_HL;
+    instruction_map[0xFA] = &CPU::ld_A_mn16;
+    instruction_map[0xFB] = &CPU::ei;
+    // instruction_map[0xFC] ILLEGAL
+    // instruction_map[0xFD] ILLEGAL
+    instruction_map[0xFE] = &CPU::cp_A_n8;
+    instruction_map[0xFF] = &CPU::rst;
 
-    cb_instr[0x00] = &CPU::rlc_r8;
-    cb_instr[0x01] = &CPU::rlc_r8;
-    cb_instr[0x02] = &CPU::rlc_r8;
-    cb_instr[0x03] = &CPU::rlc_r8;
-    cb_instr[0x04] = &CPU::rlc_r8;
-    cb_instr[0x05] = &CPU::rlc_r8;
-    cb_instr[0x06] = &CPU::rlc_mHL;
-    cb_instr[0x07] = &CPU::rlc_r8;
-    cb_instr[0x08] = &CPU::rrc_r8;
-    cb_instr[0x09] = &CPU::rrc_r8;
-    cb_instr[0x0A] = &CPU::rrc_r8;
-    cb_instr[0x0B] = &CPU::rrc_r8;
-    cb_instr[0x0C] = &CPU::rrc_r8;
-    cb_instr[0x0D] = &CPU::rrc_r8;
-    cb_instr[0x0E] = &CPU::rrc_mHL;
-    cb_instr[0x0F] = &CPU::rrc_r8;
+    cb_instruction_map[0x00] = &CPU::rlc_r8;
+    cb_instruction_map[0x01] = &CPU::rlc_r8;
+    cb_instruction_map[0x02] = &CPU::rlc_r8;
+    cb_instruction_map[0x03] = &CPU::rlc_r8;
+    cb_instruction_map[0x04] = &CPU::rlc_r8;
+    cb_instruction_map[0x05] = &CPU::rlc_r8;
+    cb_instruction_map[0x06] = &CPU::rlc_mHL;
+    cb_instruction_map[0x07] = &CPU::rlc_r8;
+    cb_instruction_map[0x08] = &CPU::rrc_r8;
+    cb_instruction_map[0x09] = &CPU::rrc_r8;
+    cb_instruction_map[0x0A] = &CPU::rrc_r8;
+    cb_instruction_map[0x0B] = &CPU::rrc_r8;
+    cb_instruction_map[0x0C] = &CPU::rrc_r8;
+    cb_instruction_map[0x0D] = &CPU::rrc_r8;
+    cb_instruction_map[0x0E] = &CPU::rrc_mHL;
+    cb_instruction_map[0x0F] = &CPU::rrc_r8;
 
-    cb_instr[0x10] = &CPU::rl_r8;
-    cb_instr[0x11] = &CPU::rl_r8;
-    cb_instr[0x12] = &CPU::rl_r8;
-    cb_instr[0x13] = &CPU::rl_r8;
-    cb_instr[0x14] = &CPU::rl_r8;
-    cb_instr[0x15] = &CPU::rl_r8;
-    cb_instr[0x16] = &CPU::rl_mHL;
-    cb_instr[0x17] = &CPU::rl_r8;
-    cb_instr[0x18] = &CPU::rr_r8;
-    cb_instr[0x19] = &CPU::rr_r8;
-    cb_instr[0x1A] = &CPU::rr_r8;
-    cb_instr[0x1B] = &CPU::rr_r8;
-    cb_instr[0x1C] = &CPU::rr_r8;
-    cb_instr[0x1D] = &CPU::rr_r8;
-    cb_instr[0x1E] = &CPU::rr_mHL;
-    cb_instr[0x1F] = &CPU::rr_r8;
+    cb_instruction_map[0x10] = &CPU::rl_r8;
+    cb_instruction_map[0x11] = &CPU::rl_r8;
+    cb_instruction_map[0x12] = &CPU::rl_r8;
+    cb_instruction_map[0x13] = &CPU::rl_r8;
+    cb_instruction_map[0x14] = &CPU::rl_r8;
+    cb_instruction_map[0x15] = &CPU::rl_r8;
+    cb_instruction_map[0x16] = &CPU::rl_mHL;
+    cb_instruction_map[0x17] = &CPU::rl_r8;
+    cb_instruction_map[0x18] = &CPU::rr_r8;
+    cb_instruction_map[0x19] = &CPU::rr_r8;
+    cb_instruction_map[0x1A] = &CPU::rr_r8;
+    cb_instruction_map[0x1B] = &CPU::rr_r8;
+    cb_instruction_map[0x1C] = &CPU::rr_r8;
+    cb_instruction_map[0x1D] = &CPU::rr_r8;
+    cb_instruction_map[0x1E] = &CPU::rr_mHL;
+    cb_instruction_map[0x1F] = &CPU::rr_r8;
 
-    cb_instr[0x20] = &CPU::sla_r8;
-    cb_instr[0x21] = &CPU::sla_r8;
-    cb_instr[0x22] = &CPU::sla_r8;
-    cb_instr[0x23] = &CPU::sla_r8;
-    cb_instr[0x24] = &CPU::sla_r8;
-    cb_instr[0x25] = &CPU::sla_r8;
-    cb_instr[0x26] = &CPU::sla_mHL;
-    cb_instr[0x27] = &CPU::sla_r8;
-    cb_instr[0x28] = &CPU::sra_r8;
-    cb_instr[0x29] = &CPU::sra_r8;
-    cb_instr[0x2A] = &CPU::sra_r8;
-    cb_instr[0x2B] = &CPU::sra_r8;
-    cb_instr[0x2C] = &CPU::sra_r8;
-    cb_instr[0x2D] = &CPU::sra_r8;
-    cb_instr[0x2E] = &CPU::sra_mHL;
-    cb_instr[0x2F] = &CPU::sra_r8;
+    cb_instruction_map[0x20] = &CPU::sla_r8;
+    cb_instruction_map[0x21] = &CPU::sla_r8;
+    cb_instruction_map[0x22] = &CPU::sla_r8;
+    cb_instruction_map[0x23] = &CPU::sla_r8;
+    cb_instruction_map[0x24] = &CPU::sla_r8;
+    cb_instruction_map[0x25] = &CPU::sla_r8;
+    cb_instruction_map[0x26] = &CPU::sla_mHL;
+    cb_instruction_map[0x27] = &CPU::sla_r8;
+    cb_instruction_map[0x28] = &CPU::sra_r8;
+    cb_instruction_map[0x29] = &CPU::sra_r8;
+    cb_instruction_map[0x2A] = &CPU::sra_r8;
+    cb_instruction_map[0x2B] = &CPU::sra_r8;
+    cb_instruction_map[0x2C] = &CPU::sra_r8;
+    cb_instruction_map[0x2D] = &CPU::sra_r8;
+    cb_instruction_map[0x2E] = &CPU::sra_mHL;
+    cb_instruction_map[0x2F] = &CPU::sra_r8;
 
-    cb_instr[0x30] = &CPU::swap_r8;
-    cb_instr[0x31] = &CPU::swap_r8;
-    cb_instr[0x32] = &CPU::swap_r8;
-    cb_instr[0x33] = &CPU::swap_r8;
-    cb_instr[0x34] = &CPU::swap_r8;
-    cb_instr[0x35] = &CPU::swap_r8;
-    cb_instr[0x36] = &CPU::swap_mHL;
-    cb_instr[0x37] = &CPU::swap_r8;
-    cb_instr[0x38] = &CPU::srl_r8;
-    cb_instr[0x39] = &CPU::srl_r8;
-    cb_instr[0x3A] = &CPU::srl_r8;
-    cb_instr[0x3B] = &CPU::srl_r8;
-    cb_instr[0x3C] = &CPU::srl_r8;
-    cb_instr[0x3D] = &CPU::srl_r8;
-    cb_instr[0x3E] = &CPU::srl_mHL;
-    cb_instr[0x3F] = &CPU::srl_r8;
+    cb_instruction_map[0x30] = &CPU::swap_r8;
+    cb_instruction_map[0x31] = &CPU::swap_r8;
+    cb_instruction_map[0x32] = &CPU::swap_r8;
+    cb_instruction_map[0x33] = &CPU::swap_r8;
+    cb_instruction_map[0x34] = &CPU::swap_r8;
+    cb_instruction_map[0x35] = &CPU::swap_r8;
+    cb_instruction_map[0x36] = &CPU::swap_mHL;
+    cb_instruction_map[0x37] = &CPU::swap_r8;
+    cb_instruction_map[0x38] = &CPU::srl_r8;
+    cb_instruction_map[0x39] = &CPU::srl_r8;
+    cb_instruction_map[0x3A] = &CPU::srl_r8;
+    cb_instruction_map[0x3B] = &CPU::srl_r8;
+    cb_instruction_map[0x3C] = &CPU::srl_r8;
+    cb_instruction_map[0x3D] = &CPU::srl_r8;
+    cb_instruction_map[0x3E] = &CPU::srl_mHL;
+    cb_instruction_map[0x3F] = &CPU::srl_r8;
 
-    cb_instr[0x40] = &CPU::bit_u3_r8;
-    cb_instr[0x41] = &CPU::bit_u3_r8;
-    cb_instr[0x42] = &CPU::bit_u3_r8;
-    cb_instr[0x43] = &CPU::bit_u3_r8;
-    cb_instr[0x44] = &CPU::bit_u3_r8;
-    cb_instr[0x45] = &CPU::bit_u3_r8;
-    cb_instr[0x46] = &CPU::bit_u3_mHL;
-    cb_instr[0x47] = &CPU::bit_u3_r8;
-    cb_instr[0x48] = &CPU::bit_u3_r8;
-    cb_instr[0x49] = &CPU::bit_u3_r8;
-    cb_instr[0x4A] = &CPU::bit_u3_r8;
-    cb_instr[0x4B] = &CPU::bit_u3_r8;
-    cb_instr[0x4C] = &CPU::bit_u3_r8;
-    cb_instr[0x4D] = &CPU::bit_u3_r8;
-    cb_instr[0x4E] = &CPU::bit_u3_mHL;
-    cb_instr[0x4F] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x40] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x41] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x42] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x43] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x44] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x45] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x46] = &CPU::bit_u3_mHL;
+    cb_instruction_map[0x47] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x48] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x49] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x4A] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x4B] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x4C] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x4D] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x4E] = &CPU::bit_u3_mHL;
+    cb_instruction_map[0x4F] = &CPU::bit_u3_r8;
 
-    cb_instr[0x50] = &CPU::bit_u3_r8;
-    cb_instr[0x51] = &CPU::bit_u3_r8;
-    cb_instr[0x52] = &CPU::bit_u3_r8;
-    cb_instr[0x53] = &CPU::bit_u3_r8;
-    cb_instr[0x54] = &CPU::bit_u3_r8;
-    cb_instr[0x55] = &CPU::bit_u3_r8;
-    cb_instr[0x56] = &CPU::bit_u3_mHL;
-    cb_instr[0x57] = &CPU::bit_u3_r8;
-    cb_instr[0x58] = &CPU::bit_u3_r8;
-    cb_instr[0x59] = &CPU::bit_u3_r8;
-    cb_instr[0x5A] = &CPU::bit_u3_r8;
-    cb_instr[0x5B] = &CPU::bit_u3_r8;
-    cb_instr[0x5C] = &CPU::bit_u3_r8;
-    cb_instr[0x5D] = &CPU::bit_u3_r8;
-    cb_instr[0x5E] = &CPU::bit_u3_mHL;
-    cb_instr[0x5F] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x50] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x51] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x52] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x53] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x54] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x55] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x56] = &CPU::bit_u3_mHL;
+    cb_instruction_map[0x57] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x58] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x59] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x5A] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x5B] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x5C] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x5D] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x5E] = &CPU::bit_u3_mHL;
+    cb_instruction_map[0x5F] = &CPU::bit_u3_r8;
 
-    cb_instr[0x60] = &CPU::bit_u3_r8;
-    cb_instr[0x61] = &CPU::bit_u3_r8;
-    cb_instr[0x62] = &CPU::bit_u3_r8;
-    cb_instr[0x63] = &CPU::bit_u3_r8;
-    cb_instr[0x64] = &CPU::bit_u3_r8;
-    cb_instr[0x65] = &CPU::bit_u3_r8;
-    cb_instr[0x66] = &CPU::bit_u3_mHL;
-    cb_instr[0x67] = &CPU::bit_u3_r8;
-    cb_instr[0x68] = &CPU::bit_u3_r8;
-    cb_instr[0x69] = &CPU::bit_u3_r8;
-    cb_instr[0x6A] = &CPU::bit_u3_r8;
-    cb_instr[0x6B] = &CPU::bit_u3_r8;
-    cb_instr[0x6C] = &CPU::bit_u3_r8;
-    cb_instr[0x6D] = &CPU::bit_u3_r8;
-    cb_instr[0x6E] = &CPU::bit_u3_mHL;
-    cb_instr[0x6F] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x60] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x61] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x62] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x63] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x64] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x65] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x66] = &CPU::bit_u3_mHL;
+    cb_instruction_map[0x67] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x68] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x69] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x6A] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x6B] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x6C] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x6D] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x6E] = &CPU::bit_u3_mHL;
+    cb_instruction_map[0x6F] = &CPU::bit_u3_r8;
 
-    cb_instr[0x70] = &CPU::bit_u3_r8;
-    cb_instr[0x71] = &CPU::bit_u3_r8;
-    cb_instr[0x72] = &CPU::bit_u3_r8;
-    cb_instr[0x73] = &CPU::bit_u3_r8;
-    cb_instr[0x74] = &CPU::bit_u3_r8;
-    cb_instr[0x75] = &CPU::bit_u3_r8;
-    cb_instr[0x76] = &CPU::bit_u3_mHL;
-    cb_instr[0x77] = &CPU::bit_u3_r8;
-    cb_instr[0x78] = &CPU::bit_u3_r8;
-    cb_instr[0x79] = &CPU::bit_u3_r8;
-    cb_instr[0x7A] = &CPU::bit_u3_r8;
-    cb_instr[0x7B] = &CPU::bit_u3_r8;
-    cb_instr[0x7C] = &CPU::bit_u3_r8;
-    cb_instr[0x7D] = &CPU::bit_u3_r8;
-    cb_instr[0x7E] = &CPU::bit_u3_mHL;
-    cb_instr[0x7F] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x70] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x71] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x72] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x73] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x74] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x75] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x76] = &CPU::bit_u3_mHL;
+    cb_instruction_map[0x77] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x78] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x79] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x7A] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x7B] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x7C] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x7D] = &CPU::bit_u3_r8;
+    cb_instruction_map[0x7E] = &CPU::bit_u3_mHL;
+    cb_instruction_map[0x7F] = &CPU::bit_u3_r8;
 
-    cb_instr[0x80] = &CPU::res_u3_r8;
-    cb_instr[0x81] = &CPU::res_u3_r8;
-    cb_instr[0x82] = &CPU::res_u3_r8;
-    cb_instr[0x83] = &CPU::res_u3_r8;
-    cb_instr[0x84] = &CPU::res_u3_r8;
-    cb_instr[0x85] = &CPU::res_u3_r8;
-    cb_instr[0x86] = &CPU::res_u3_mHL;
-    cb_instr[0x87] = &CPU::res_u3_r8;
-    cb_instr[0x88] = &CPU::res_u3_r8;
-    cb_instr[0x89] = &CPU::res_u3_r8;
-    cb_instr[0x8A] = &CPU::res_u3_r8;
-    cb_instr[0x8B] = &CPU::res_u3_r8;
-    cb_instr[0x8C] = &CPU::res_u3_r8;
-    cb_instr[0x8D] = &CPU::res_u3_r8;
-    cb_instr[0x8E] = &CPU::res_u3_mHL;
-    cb_instr[0x8F] = &CPU::res_u3_r8;
+    cb_instruction_map[0x80] = &CPU::res_u3_r8;
+    cb_instruction_map[0x81] = &CPU::res_u3_r8;
+    cb_instruction_map[0x82] = &CPU::res_u3_r8;
+    cb_instruction_map[0x83] = &CPU::res_u3_r8;
+    cb_instruction_map[0x84] = &CPU::res_u3_r8;
+    cb_instruction_map[0x85] = &CPU::res_u3_r8;
+    cb_instruction_map[0x86] = &CPU::res_u3_mHL;
+    cb_instruction_map[0x87] = &CPU::res_u3_r8;
+    cb_instruction_map[0x88] = &CPU::res_u3_r8;
+    cb_instruction_map[0x89] = &CPU::res_u3_r8;
+    cb_instruction_map[0x8A] = &CPU::res_u3_r8;
+    cb_instruction_map[0x8B] = &CPU::res_u3_r8;
+    cb_instruction_map[0x8C] = &CPU::res_u3_r8;
+    cb_instruction_map[0x8D] = &CPU::res_u3_r8;
+    cb_instruction_map[0x8E] = &CPU::res_u3_mHL;
+    cb_instruction_map[0x8F] = &CPU::res_u3_r8;
 
-    cb_instr[0x90] = &CPU::res_u3_r8;
-    cb_instr[0x91] = &CPU::res_u3_r8;
-    cb_instr[0x92] = &CPU::res_u3_r8;
-    cb_instr[0x93] = &CPU::res_u3_r8;
-    cb_instr[0x94] = &CPU::res_u3_r8;
-    cb_instr[0x95] = &CPU::res_u3_r8;
-    cb_instr[0x96] = &CPU::res_u3_mHL;
-    cb_instr[0x97] = &CPU::res_u3_r8;
-    cb_instr[0x98] = &CPU::res_u3_r8;
-    cb_instr[0x99] = &CPU::res_u3_r8;
-    cb_instr[0x9A] = &CPU::res_u3_r8;
-    cb_instr[0x9B] = &CPU::res_u3_r8;
-    cb_instr[0x9C] = &CPU::res_u3_r8;
-    cb_instr[0x9D] = &CPU::res_u3_r8;
-    cb_instr[0x9E] = &CPU::res_u3_mHL;
-    cb_instr[0x9F] = &CPU::res_u3_r8;
+    cb_instruction_map[0x90] = &CPU::res_u3_r8;
+    cb_instruction_map[0x91] = &CPU::res_u3_r8;
+    cb_instruction_map[0x92] = &CPU::res_u3_r8;
+    cb_instruction_map[0x93] = &CPU::res_u3_r8;
+    cb_instruction_map[0x94] = &CPU::res_u3_r8;
+    cb_instruction_map[0x95] = &CPU::res_u3_r8;
+    cb_instruction_map[0x96] = &CPU::res_u3_mHL;
+    cb_instruction_map[0x97] = &CPU::res_u3_r8;
+    cb_instruction_map[0x98] = &CPU::res_u3_r8;
+    cb_instruction_map[0x99] = &CPU::res_u3_r8;
+    cb_instruction_map[0x9A] = &CPU::res_u3_r8;
+    cb_instruction_map[0x9B] = &CPU::res_u3_r8;
+    cb_instruction_map[0x9C] = &CPU::res_u3_r8;
+    cb_instruction_map[0x9D] = &CPU::res_u3_r8;
+    cb_instruction_map[0x9E] = &CPU::res_u3_mHL;
+    cb_instruction_map[0x9F] = &CPU::res_u3_r8;
 
-    cb_instr[0xA0] = &CPU::res_u3_r8;
-    cb_instr[0xA1] = &CPU::res_u3_r8;
-    cb_instr[0xA2] = &CPU::res_u3_r8;
-    cb_instr[0xA3] = &CPU::res_u3_r8;
-    cb_instr[0xA4] = &CPU::res_u3_r8;
-    cb_instr[0xA5] = &CPU::res_u3_r8;
-    cb_instr[0xA6] = &CPU::res_u3_mHL;
-    cb_instr[0xA7] = &CPU::res_u3_r8;
-    cb_instr[0xA8] = &CPU::res_u3_r8;
-    cb_instr[0xA9] = &CPU::res_u3_r8;
-    cb_instr[0xAA] = &CPU::res_u3_r8;
-    cb_instr[0xAB] = &CPU::res_u3_r8;
-    cb_instr[0xAC] = &CPU::res_u3_r8;
-    cb_instr[0xAD] = &CPU::res_u3_r8;
-    cb_instr[0xAE] = &CPU::res_u3_mHL;
-    cb_instr[0xAF] = &CPU::res_u3_r8;
+    cb_instruction_map[0xA0] = &CPU::res_u3_r8;
+    cb_instruction_map[0xA1] = &CPU::res_u3_r8;
+    cb_instruction_map[0xA2] = &CPU::res_u3_r8;
+    cb_instruction_map[0xA3] = &CPU::res_u3_r8;
+    cb_instruction_map[0xA4] = &CPU::res_u3_r8;
+    cb_instruction_map[0xA5] = &CPU::res_u3_r8;
+    cb_instruction_map[0xA6] = &CPU::res_u3_mHL;
+    cb_instruction_map[0xA7] = &CPU::res_u3_r8;
+    cb_instruction_map[0xA8] = &CPU::res_u3_r8;
+    cb_instruction_map[0xA9] = &CPU::res_u3_r8;
+    cb_instruction_map[0xAA] = &CPU::res_u3_r8;
+    cb_instruction_map[0xAB] = &CPU::res_u3_r8;
+    cb_instruction_map[0xAC] = &CPU::res_u3_r8;
+    cb_instruction_map[0xAD] = &CPU::res_u3_r8;
+    cb_instruction_map[0xAE] = &CPU::res_u3_mHL;
+    cb_instruction_map[0xAF] = &CPU::res_u3_r8;
 
-    cb_instr[0xB0] = &CPU::res_u3_r8;
-    cb_instr[0xB1] = &CPU::res_u3_r8;
-    cb_instr[0xB2] = &CPU::res_u3_r8;
-    cb_instr[0xB3] = &CPU::res_u3_r8;
-    cb_instr[0xB4] = &CPU::res_u3_r8;
-    cb_instr[0xB5] = &CPU::res_u3_r8;
-    cb_instr[0xB6] = &CPU::res_u3_mHL;
-    cb_instr[0xB7] = &CPU::res_u3_r8;
-    cb_instr[0xB8] = &CPU::res_u3_r8;
-    cb_instr[0xB9] = &CPU::res_u3_r8;
-    cb_instr[0xBA] = &CPU::res_u3_r8;
-    cb_instr[0xBB] = &CPU::res_u3_r8;
-    cb_instr[0xBC] = &CPU::res_u3_r8;
-    cb_instr[0xBD] = &CPU::res_u3_r8;
-    cb_instr[0xBE] = &CPU::res_u3_mHL;
-    cb_instr[0xBF] = &CPU::res_u3_r8;
+    cb_instruction_map[0xB0] = &CPU::res_u3_r8;
+    cb_instruction_map[0xB1] = &CPU::res_u3_r8;
+    cb_instruction_map[0xB2] = &CPU::res_u3_r8;
+    cb_instruction_map[0xB3] = &CPU::res_u3_r8;
+    cb_instruction_map[0xB4] = &CPU::res_u3_r8;
+    cb_instruction_map[0xB5] = &CPU::res_u3_r8;
+    cb_instruction_map[0xB6] = &CPU::res_u3_mHL;
+    cb_instruction_map[0xB7] = &CPU::res_u3_r8;
+    cb_instruction_map[0xB8] = &CPU::res_u3_r8;
+    cb_instruction_map[0xB9] = &CPU::res_u3_r8;
+    cb_instruction_map[0xBA] = &CPU::res_u3_r8;
+    cb_instruction_map[0xBB] = &CPU::res_u3_r8;
+    cb_instruction_map[0xBC] = &CPU::res_u3_r8;
+    cb_instruction_map[0xBD] = &CPU::res_u3_r8;
+    cb_instruction_map[0xBE] = &CPU::res_u3_mHL;
+    cb_instruction_map[0xBF] = &CPU::res_u3_r8;
 
-    cb_instr[0xC0] = &CPU::set_u3_r8;
-    cb_instr[0xC1] = &CPU::set_u3_r8;
-    cb_instr[0xC2] = &CPU::set_u3_r8;
-    cb_instr[0xC3] = &CPU::set_u3_r8;
-    cb_instr[0xC4] = &CPU::set_u3_r8;
-    cb_instr[0xC5] = &CPU::set_u3_r8;
-    cb_instr[0xC6] = &CPU::set_u3_mHL;
-    cb_instr[0xC7] = &CPU::set_u3_r8;
-    cb_instr[0xC8] = &CPU::set_u3_r8;
-    cb_instr[0xC9] = &CPU::set_u3_r8;
-    cb_instr[0xCA] = &CPU::set_u3_r8;
-    cb_instr[0xCB] = &CPU::set_u3_r8;
-    cb_instr[0xCC] = &CPU::set_u3_r8;
-    cb_instr[0xCD] = &CPU::set_u3_r8;
-    cb_instr[0xCE] = &CPU::set_u3_mHL;
-    cb_instr[0xCF] = &CPU::set_u3_r8;
+    cb_instruction_map[0xC0] = &CPU::set_u3_r8;
+    cb_instruction_map[0xC1] = &CPU::set_u3_r8;
+    cb_instruction_map[0xC2] = &CPU::set_u3_r8;
+    cb_instruction_map[0xC3] = &CPU::set_u3_r8;
+    cb_instruction_map[0xC4] = &CPU::set_u3_r8;
+    cb_instruction_map[0xC5] = &CPU::set_u3_r8;
+    cb_instruction_map[0xC6] = &CPU::set_u3_mHL;
+    cb_instruction_map[0xC7] = &CPU::set_u3_r8;
+    cb_instruction_map[0xC8] = &CPU::set_u3_r8;
+    cb_instruction_map[0xC9] = &CPU::set_u3_r8;
+    cb_instruction_map[0xCA] = &CPU::set_u3_r8;
+    cb_instruction_map[0xCB] = &CPU::set_u3_r8;
+    cb_instruction_map[0xCC] = &CPU::set_u3_r8;
+    cb_instruction_map[0xCD] = &CPU::set_u3_r8;
+    cb_instruction_map[0xCE] = &CPU::set_u3_mHL;
+    cb_instruction_map[0xCF] = &CPU::set_u3_r8;
 
-    cb_instr[0xD0] = &CPU::set_u3_r8;
-    cb_instr[0xD1] = &CPU::set_u3_r8;
-    cb_instr[0xD2] = &CPU::set_u3_r8;
-    cb_instr[0xD3] = &CPU::set_u3_r8;
-    cb_instr[0xD4] = &CPU::set_u3_r8;
-    cb_instr[0xD5] = &CPU::set_u3_r8;
-    cb_instr[0xD6] = &CPU::set_u3_mHL;
-    cb_instr[0xD7] = &CPU::set_u3_r8;
-    cb_instr[0xD8] = &CPU::set_u3_r8;
-    cb_instr[0xD9] = &CPU::set_u3_r8;
-    cb_instr[0xDA] = &CPU::set_u3_r8;
-    cb_instr[0xDB] = &CPU::set_u3_r8;
-    cb_instr[0xDC] = &CPU::set_u3_r8;
-    cb_instr[0xDD] = &CPU::set_u3_r8;
-    cb_instr[0xDE] = &CPU::set_u3_mHL;
-    cb_instr[0xDF] = &CPU::set_u3_r8;
+    cb_instruction_map[0xD0] = &CPU::set_u3_r8;
+    cb_instruction_map[0xD1] = &CPU::set_u3_r8;
+    cb_instruction_map[0xD2] = &CPU::set_u3_r8;
+    cb_instruction_map[0xD3] = &CPU::set_u3_r8;
+    cb_instruction_map[0xD4] = &CPU::set_u3_r8;
+    cb_instruction_map[0xD5] = &CPU::set_u3_r8;
+    cb_instruction_map[0xD6] = &CPU::set_u3_mHL;
+    cb_instruction_map[0xD7] = &CPU::set_u3_r8;
+    cb_instruction_map[0xD8] = &CPU::set_u3_r8;
+    cb_instruction_map[0xD9] = &CPU::set_u3_r8;
+    cb_instruction_map[0xDA] = &CPU::set_u3_r8;
+    cb_instruction_map[0xDB] = &CPU::set_u3_r8;
+    cb_instruction_map[0xDC] = &CPU::set_u3_r8;
+    cb_instruction_map[0xDD] = &CPU::set_u3_r8;
+    cb_instruction_map[0xDE] = &CPU::set_u3_mHL;
+    cb_instruction_map[0xDF] = &CPU::set_u3_r8;
 
-    cb_instr[0xE0] = &CPU::set_u3_r8;
-    cb_instr[0xE1] = &CPU::set_u3_r8;
-    cb_instr[0xE2] = &CPU::set_u3_r8;
-    cb_instr[0xE3] = &CPU::set_u3_r8;
-    cb_instr[0xE4] = &CPU::set_u3_r8;
-    cb_instr[0xE5] = &CPU::set_u3_r8;
-    cb_instr[0xE6] = &CPU::set_u3_mHL;
-    cb_instr[0xE7] = &CPU::set_u3_r8;
-    cb_instr[0xE8] = &CPU::set_u3_r8;
-    cb_instr[0xE9] = &CPU::set_u3_r8;
-    cb_instr[0xEA] = &CPU::set_u3_r8;
-    cb_instr[0xEB] = &CPU::set_u3_r8;
-    cb_instr[0xEC] = &CPU::set_u3_r8;
-    cb_instr[0xED] = &CPU::set_u3_r8;
-    cb_instr[0xEE] = &CPU::set_u3_mHL;
-    cb_instr[0xEF] = &CPU::set_u3_r8;
+    cb_instruction_map[0xE0] = &CPU::set_u3_r8;
+    cb_instruction_map[0xE1] = &CPU::set_u3_r8;
+    cb_instruction_map[0xE2] = &CPU::set_u3_r8;
+    cb_instruction_map[0xE3] = &CPU::set_u3_r8;
+    cb_instruction_map[0xE4] = &CPU::set_u3_r8;
+    cb_instruction_map[0xE5] = &CPU::set_u3_r8;
+    cb_instruction_map[0xE6] = &CPU::set_u3_mHL;
+    cb_instruction_map[0xE7] = &CPU::set_u3_r8;
+    cb_instruction_map[0xE8] = &CPU::set_u3_r8;
+    cb_instruction_map[0xE9] = &CPU::set_u3_r8;
+    cb_instruction_map[0xEA] = &CPU::set_u3_r8;
+    cb_instruction_map[0xEB] = &CPU::set_u3_r8;
+    cb_instruction_map[0xEC] = &CPU::set_u3_r8;
+    cb_instruction_map[0xED] = &CPU::set_u3_r8;
+    cb_instruction_map[0xEE] = &CPU::set_u3_mHL;
+    cb_instruction_map[0xEF] = &CPU::set_u3_r8;
 
-    cb_instr[0xF0] = &CPU::set_u3_r8;
-    cb_instr[0xF1] = &CPU::set_u3_r8;
-    cb_instr[0xF2] = &CPU::set_u3_r8;
-    cb_instr[0xF3] = &CPU::set_u3_r8;
-    cb_instr[0xF4] = &CPU::set_u3_r8;
-    cb_instr[0xF5] = &CPU::set_u3_r8;
-    cb_instr[0xF6] = &CPU::set_u3_mHL;
-    cb_instr[0xF7] = &CPU::set_u3_r8;
-    cb_instr[0xF8] = &CPU::set_u3_r8;
-    cb_instr[0xF9] = &CPU::set_u3_r8;
-    cb_instr[0xFA] = &CPU::set_u3_r8;
-    cb_instr[0xFB] = &CPU::set_u3_r8;
-    cb_instr[0xFC] = &CPU::set_u3_r8;
-    cb_instr[0xFD] = &CPU::set_u3_r8;
-    cb_instr[0xFE] = &CPU::set_u3_mHL;
-    cb_instr[0xFF] = &CPU::set_u3_r8;
+    cb_instruction_map[0xF0] = &CPU::set_u3_r8;
+    cb_instruction_map[0xF1] = &CPU::set_u3_r8;
+    cb_instruction_map[0xF2] = &CPU::set_u3_r8;
+    cb_instruction_map[0xF3] = &CPU::set_u3_r8;
+    cb_instruction_map[0xF4] = &CPU::set_u3_r8;
+    cb_instruction_map[0xF5] = &CPU::set_u3_r8;
+    cb_instruction_map[0xF6] = &CPU::set_u3_mHL;
+    cb_instruction_map[0xF7] = &CPU::set_u3_r8;
+    cb_instruction_map[0xF8] = &CPU::set_u3_r8;
+    cb_instruction_map[0xF9] = &CPU::set_u3_r8;
+    cb_instruction_map[0xFA] = &CPU::set_u3_r8;
+    cb_instruction_map[0xFB] = &CPU::set_u3_r8;
+    cb_instruction_map[0xFC] = &CPU::set_u3_r8;
+    cb_instruction_map[0xFD] = &CPU::set_u3_r8;
+    cb_instruction_map[0xFE] = &CPU::set_u3_mHL;
+    cb_instruction_map[0xFF] = &CPU::set_u3_r8;
 }
