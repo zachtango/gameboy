@@ -21,20 +21,20 @@ const int FRAME_RATE = 60;
 int main() {
 
     std::vector<std::string> v {
-        // "roms/dmg-acid2.gb",
-        // "roms/DrMario.gb",
-        "bgbtest.gb",
-        "01-special.gb",
-        "02-interrupts.gb",
-        "03-op sp,hl.gb",
-        "04-op r,imm.gb",
-        "05-op rp.gb",
-        "06-ld r,r.gb",
-        "07-jr,jp,call,ret,rst.gb",
-        "08-misc instrs.gb",
-        "09-op r,r.gb",
-        "10-bit ops.gb",
-        "11-op a,(hl).gb"
+        "roms/Tetris.gb",
+        "roms/DrMario.gb",
+        // "bgbtest.gb",
+        // "01-special.gb",
+        // "02-interrupts.gb",
+        // "03-op sp,hl.gb",
+        // "04-op r,imm.gb",
+        // "05-op rp.gb",
+        // "06-ld r,r.gb",
+        // "07-jr,jp,call,ret,rst.gb",
+        // "08-misc instrs.gb",
+        // "09-op r,r.gb",
+        // "10-bit ops.gb",
+        // "11-op a,(hl).gb"
     };
 
     // Create a window and renderer
@@ -43,7 +43,7 @@ int main() {
     SDL_RenderSetScale(renderer, 3, 3);
 
     // Create a texture to hold the pixel data
-    SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_BGR444, SDL_TEXTUREACCESS_STREAMING, VIDEO_WIDTH, VIDEO_HEIGHT);
+    SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_BGR555, SDL_TEXTUREACCESS_STREAMING, VIDEO_WIDTH, VIDEO_HEIGHT);
     
     SDL_PumpEvents();
 
@@ -76,6 +76,7 @@ int main() {
         while(running) {
             U32 cycles;
             
+            
             if(!cpu.halt_mode) {
                 cycles = cpu.fetch_decode_execute();
             } else {
@@ -86,12 +87,7 @@ int main() {
                 cycles = 4;
             }
 
-            for(int j = 0; j < cycles; j++) {
-                timer.tick();
-                ppu.tick();
-            }
-
-            cycles = interrupts.handle_interrupt(cpu);
+            cycles += interrupts.handle_interrupt(cpu);
 
             for(int j = 0; j < cycles; j++) {
                 timer.tick();

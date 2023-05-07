@@ -8,13 +8,13 @@
 
 #include <execinfo.h>
 
-char out_r8(U32 r8) {
-    char c[] = {'A', 'F', 'B', 'C', 'D', 'E', 'H', 'L'};
+const char out_r8(U32 r8) {
+    static const char c[] = {'A', 'F', 'B', 'C', 'D', 'E', 'H', 'L'};
     return c[r8];
 }
 
-char* out_r16(U32 r16) {
-    char *c[7] = {"AF", "", "BC", "", "DE", "", "HL"};
+const char *out_r16(U32 r16) {
+    static const char *c[7] = {"AF", "", "BC", "", "DE", "", "HL"};
     
     return c[r16];
 }
@@ -1823,11 +1823,9 @@ U32 CPU::ret_cc() {
 
 U32 CPU::reti() {
 
-    // FIXME set IME
-
     ret();
 
-    // IME = 1;
+    interrupt_master_enable = true;
 
     // 16 T Cycles
     return 16;

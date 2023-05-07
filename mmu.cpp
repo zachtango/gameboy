@@ -153,6 +153,9 @@ BYTE MMU::read(WORD address) {
     // 0xFFFF
     else if(address == 0xFFFF)
         return interrupts.read(address);
+    
+    std::cerr << "Address out of MMU range\n";
+    throw "Address out of MMU range";
 }
 
 void MMU::write(WORD address, BYTE value) {
@@ -162,8 +165,10 @@ void MMU::write(WORD address, BYTE value) {
 
     // 0x0000 - 0x3FFF bank0
     // 0x4000 - 0x7FFF bank1
-    if(address < 0x8000)
-        cartridge.write(address, value);
+    if(address < 0x8000) {
+        std::cerr << "Should not be writing to ROM (Read Only Memory)\n";
+        return;
+    }
 
     // 0x8000 - 0x9FFF VRAM
     else if(address < 0xA000)

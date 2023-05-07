@@ -67,7 +67,7 @@ void Interrupts::request_interrupt(BYTE interrupt_mask) {
 /* MEMORY FUNCTIONS */
 BYTE Interrupts::read(WORD address) {
     BYTE *p = memory_map(address);
-    // std::cout << "val: " << (int) *p << '\n';
+
     // bit 8 - 5 unused --> return 1s for those
     return *p | (0b11100000);
 }

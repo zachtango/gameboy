@@ -2,7 +2,7 @@
 #include <fstream>
 
 
-static char *rom_type[0x100] {
+static const char *rom_type[0x100] {
     [0x00] = "ROM ONLY",
     [0x01] = "MBC1",
     [0x02] = "MBC1+RAM",
@@ -94,6 +94,12 @@ BYTE Cartridge::read(WORD address) {
 }
 
 void Cartridge::write(WORD address, BYTE value) {
+    if(0 <= address && address <= 0x8000) {
+        // let this write go thru, but don't actually write anything
+        std::cerr << std::hex << address << "Should not be writing to ROM (Read Only Memory)\n";
+        return;
+    }
+
     BYTE *p = memory_map(address);
     *p = value;
 }

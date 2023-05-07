@@ -49,15 +49,14 @@ BYTE Joypad::read(WORD address) {
     // lower 4 bits of register
     BYTE lo = 0;
 
-    // if(select_action) {
-    //     lo = (
-    //         (start << 3) |
-    //         (select << 2) |
-    //         (b << 1) |
-    //         (a)
-    //     );
-    // } else 
-    if(select_direction) {
+    if(select_action) {
+        lo = (
+            (start << 3) |
+            (select << 2) |
+            (b << 1) |
+            (a)
+        );
+    } else if(select_direction) {
         lo = (
             (down << 3) |
             (up << 2) |

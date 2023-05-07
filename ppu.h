@@ -6,8 +6,9 @@
 #include "helpers.h"
 #include "interrupts.h"
 
-
-class Interrupts;
+#define BYTES_PER_TILE 16
+#define BYTES_PER_TILE_LINE 2
+#define NULL_SPRITE_ADDRESS 0xFF
 
 typedef enum ppu_mode {
     oam_scan = 2,
@@ -47,9 +48,8 @@ public:
     BYTE read(WORD address);
     void write(WORD address, BYTE value);
 
-    /* VIDEO + TILES */
+    /* VIDEO */
     WORD video[144][160];
-    WORD tiles[192][128];
 
 private:
     // holds whether STAT was on last check
@@ -78,9 +78,9 @@ private:
 
     /* RENDERING */
     const WORD color[4] {
-        0b0000111111111111, // White
-        0b0000010101010101, // Mid Gray
-        0b0000001000100010, // Light Gray
+        0b0111111111111111, // White
+        0b0101001010010100, // Light Gray
+        0b0001110011100111, // Mid Gray
         0b0000000000000000 // Black
     };
 

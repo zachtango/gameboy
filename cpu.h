@@ -391,7 +391,7 @@ private:
 };
 
 
-static char* INSTRUCTION_NAME_MAP[0x100] = {
+static const char *INSTRUCTION_NAME_MAP[0x100] {
     [0x00] = "nop;",
     [0x01] = "ld_r16_n16;",
     [0x02] = "ld_mr16_A;",
@@ -665,7 +665,7 @@ static char* INSTRUCTION_NAME_MAP[0x100] = {
     [0xFF] = "rst;",
 };
 
-static char* CB_INSTRUCTION_NAME_MAP[0x100] = {
+static const char *CB_INSTRUCTION_NAME_MAP[0x100] {
     [0x00] = "rlc_r8",
     [0x01] = "rlc_r8",
     [0x02] = "rlc_r8",

@@ -26,14 +26,19 @@ BYTE PPU::read(WORD address) {
 }
 
 void PPU::write(WORD address, BYTE value) {
-    // switch(address) {
-    //     // status
-    //     case 0xFF44:
-    //     case 0xFF45:
-    //     case 0xFF41:
-    //         // sends STAT interrupt if supposed to
-    //         is_stat_on();
-    // }
+
+    // https://gbdev.io/pandocs/Hardware_Reg_List.html?highlight=hardware%20registers#hardware-registers
+    // some registers are R/W, R, or W
+    if(address == 0xFF44) {
+        // LY 0xFF44
+        std::cerr << "Cannot write to read only register LY (0xFF44)\n";
+        throw "Cannot write to read only register LY (0xFF44)";
+    } else if(address == 0xFF41) {
+        // status bits 3 - 6 R/W
+        status &= 0b10000111;
+        status |= value & 0b01111000;
+        return;
+    }
 
     BYTE *p = memory_map(address);
     *p = value;
@@ -58,12 +63,12 @@ BYTE* PPU::memory_map(WORD address) {
             return &control;
 
         // status
+        case 0xFF41:
+            return &status;
         case 0xFF44:
             return &ly;
         case 0xFF45:
             return &lyc;
-        case 0xFF41:
-            return &status;
 
         // position and scrolling
         case 0xFF42:
@@ -122,22 +127,18 @@ void PPU::oam_scan() {
         // y = position of top of Sprite + 16
         BYTE y = oam[address];
         
-        // x = postiion of left of Sprite + 8
-        BYTE x = oam[address + 1];
-        
         // position_y of Sprite = y - 16
         // validate Sprite
         if( (y - 16) <= ly && ly < (y - 16 + h) ) {
             // add Sprite to 10 Sprite list
             sprite_addresses[counter] = address;
-
             counter += 1;
         }
     }
 
     // set rest of sprite addresses to 0, so we don't render sprites from previous lines
     for(; counter < 10; counter++) {
-        sprite_addresses[counter] = 0;
+        sprite_addresses[counter] = NULL_SPRITE_ADDRESS;
     }
 
     // switch mode to Pixel Transfer by setting lower 2 bits of lcd status
@@ -158,10 +159,9 @@ void PPU::pixel_transfer() {
     // write line to video at current line (ly)
     write_line();
 
-    // https://gbdev.io/pandocs/STAT.html#ff41--stat-lcd-status
-    // if H Blank source interrupt (bit 3 of status), send STAT interrupt
-    if(get_bit(status, 3))
+    if(get_bit(status, 3)) {
         interrupts.request_interrupt(LCD_STAT_INTERRUPT);
+    }
 
     // switch mode to H Blank by setting lower 2 bits of lcd status
     SET_PPU_MODE(ppu_mode::h_blank)
@@ -175,7 +175,7 @@ void PPU::h_blank() {
     // Wait until end of H Blank mode
     if(ticks < 456)
         return;
-    
+
     // reset ticks back to 0 for starting at beginning of next line
     ticks = 0;
     
@@ -183,25 +183,20 @@ void PPU::h_blank() {
 
     // bottom of screen reached
     if(ly == 144) {
-        // std::cout << "vblank sent\n";
-        
-        // switch mode to V Blank by setting lower 2 bits of lcd status
-        SET_PPU_MODE(ppu_mode::v_blank)
-
         // send v blank interrupt
         interrupts.request_interrupt(VBLANK_INTERRUPT);
 
-        // https://gbdev.io/pandocs/STAT.html#ff41--stat-lcd-status
-        // if V Blank source interrupt (bit 4 of status), send STAT interrupt
-        if(get_bit(control, 4))
+        if(get_bit(status, 4)) {
             interrupts.request_interrupt(LCD_STAT_INTERRUPT);
-        
-        return;
-    }
+        }
 
-    // we can still write next line (bottom of screen not reached)
-    // switch mode to OAM Scan by setting lower 2 bits of lcd status
-    SET_PPU_MODE(ppu_mode::oam_scan)
+        // switch mode to V Blank by setting lower 2 bits of lcd status
+        SET_PPU_MODE(ppu_mode::v_blank)
+    } else {
+        // we can still write next line (bottom of screen not reached)
+        // switch mode to OAM Scan by setting lower 2 bits of lcd status
+        SET_PPU_MODE(ppu_mode::oam_scan)
+    }
 }
 
 /* V BLANK
@@ -218,11 +213,7 @@ void PPU::v_blank() {
     increment_ly();
 
     // end of V Blank, frame finished
-    if(ly == 154) {
-        // reset ly and window ly for next frame
-        ly = 0;
-        window_ly = 0;
-        
+    if(ly == 0) {
         // switch mode to OAM Scan by setting lower 2 bits of lcd status
         SET_PPU_MODE(ppu_mode::oam_scan)
     }
@@ -232,10 +223,13 @@ void PPU::v_blank() {
 /* PPU MODE HELPERS */
 bool PPU::is_stat_on() {
     // holds mask to AND with STAT
+    // check LYC=LY flag first
     BYTE mask = get_bit(status, 2) ? 1 << 6 : 0;
 
-    mask |= 1 << (status & 0b11 + 3);
+    // (1 << ((status & 0b11) + 3)) gets mode based mask --> AND with 0b0111000 to not include mode 3
+    mask |= ((1 << ((status & 0b11) + 3)) & 0b0111000); 
 
+    // mask AND status register
     bool stat_on = mask & status;
 
     // send STAT interrupt when going from low to high
@@ -248,6 +242,10 @@ bool PPU::is_stat_on() {
     return stat_on;
 }
 
+/*
+    Returns true if
+        control(0), control(5), ly >= wy, ly < wy + 144, wx >= 0, wx <= 166, wy >= 0, wy <= 143
+*/
 bool PPU::is_window_visible() {
     return (
         // https://gbdev.io/pandocs/LCDC.html#lcdc5--window-enable
@@ -257,7 +255,8 @@ bool PPU::is_window_visible() {
 
         // https://gbdev.io/pandocs/Scrolling.html#ff4aff4b--wy-wx-window-y-position-x-position-plus-7
         // window criteria
-        ly >= wy &&
+        (ly >= wy) &&
+        (ly <= wy + 143) &&
         (wx >= 0 && wx <= 166) &&
         (wy >= 0 && wy <= 143)
     );
@@ -272,34 +271,41 @@ void PPU::increment_ly() {
     // increment ly
     ly += 1;
 
+    if(ly == 154) {
+        // reset ly and window ly for next frame
+        ly = 0;
+        window_ly = 0;
+    }
+
     // set LYC=LY flag (bit 2 of status)
     status = set_bit(status, 2, lyc == ly);
 
-    // check LYC=LY STAT interrupt source
-    if(get_bit(status, 6))
+    if(lyc == ly && get_bit(status, 6)) {
         interrupts.request_interrupt(LCD_STAT_INTERRUPT);
+    }
 }
 
 void PPU::write_line() {
 
     // https://gbdev.io/pandocs/LCDC.html
     // window and background bit of LCD Control
+    // handle window and background
     if(get_bit(control, 0)) {
         // tracks current pixel in the line
         int x = 0;
         
         while(x < 160) {
             // hold line of 8x8 tile being rendered
-            int tile_y;
+            int tile_line;
             // hold column of 8x8 tile being rendered
-            int tile_x;
+            int tile_column;
 
             // hold address of tile within tilemap (32 x 32) --> (0 ... 1023) + tile_map_address_start
             WORD tile_map_address;
 
             // http://pixelbits.16-b.it/GBEDG/ppu/
             // background and window pixel fetching
-            if(is_window_visible() && x + 7 >= wx) {
+            if(is_window_visible() && (x + 7) >= wx) {
                 // https://gbdev.io/pandocs/Scrolling.html#ff4aff4b--wy-wx-window-y-position-x-position-plus-7
                 // window conditions
 
@@ -310,11 +316,12 @@ void PPU::write_line() {
                 tile_map_address += (x + 7 - wx) / 8;
 
                 // factor in the window tile's position in the current column
-                tile_map_address += 32 * (window_ly) / 8;
+                tile_map_address += 32 * (window_ly / 8);
 
-                tile_x = (x + 7 - wx) % 8;
-                tile_y = window_ly % 8;
-            } else {
+                tile_column = (x + 7 - wx) % 8;
+                tile_line = window_ly % 8;
+            } else 
+            {
                 // get background tilemap address start (bit 3 of control decides 9C00 vs 9800)
                 tile_map_address = get_bit(control, 3) ? 0x9C00 : 0x9800;
 
@@ -326,89 +333,120 @@ void PPU::write_line() {
                 // we mod 32 because there are 32 tiles in a column (numbered 0 - 31)
                 tile_map_address += 32 * (((ly + scy) / 8) % 32);
 
-                tile_x = (x + scx) % 8;
-                tile_y = (ly + scy) % 8;
+                tile_column = (x + scx) % 8;
+                tile_line = (ly + scy) % 8;
             }
 
             // https://gbdev.io/pandocs/Tile_Data.html
             // get tile id used to get the address of where the tile data
             BYTE tile_id = vram[tile_map_address - 0x8000];
             WORD tile_address;
+
             if(get_bit(control, 4)) {
                 // 8000 addressing
                 // 0x8000 + 16 bytes per tile * tile_id + 2 bytes per tile line
-                tile_address = 0x8000 + 16 * tile_id + 2 * tile_y;
+                tile_address = 0x8000 + BYTES_PER_TILE * tile_id + BYTES_PER_TILE_LINE * tile_line;
             } else {
                 // 8800 addressing
                 // 0x9000 + 16 bytes per tile * tile_id + 2 bytes per tile line
-                tile_address = 0x9000 + 16 * (SIGNED_BYTE) tile_id + 2 * tile_y;
+                tile_address = 0x9000 + BYTES_PER_TILE * (SIGNED_BYTE) tile_id + BYTES_PER_TILE_LINE * tile_line;
             }
 
             // gameboy is little endian --> lsb comes first
             BYTE tile_lo = vram[tile_address - 0x8000];
             BYTE tile_hi = vram[tile_address + 1 - 0x8000];
 
-            for(; tile_x < 8; tile_x++, x++) {
+            for(; tile_column < 8; tile_column++, x++) {
                 if(x >= 160)
                     break;
 
                 // store 2bpp pixel value
-                line[x][0] = (get_bit(tile_hi, (7 - tile_x)) << 1) | get_bit(tile_lo, (7 - tile_x));
+                line[x][0] = (get_bit(tile_hi, (7 - tile_column)) << 1) | get_bit(tile_lo, (7 - tile_column));
                 // store 0 for background and window
                 line[x][1] = 0;
             }
         }
     }
 
+    // https://gbdev.io/pandocs/LCDC.html
+    // sprite enable bit
+    // handle sprites
     if(get_bit(control, 1)) {
         // render sprites
         for(int i = 0; i < 10; i++) {
-            WORD address = sprite_addresses[i]; // first tile is top of sprite for h == 16
-
-            if(address == 0)
-                break;
-
-            BYTE y = vram[address - 0x8000],
-                x = vram[address + 1 - 0x8000],
-                tile_index = vram[address + 2 - 0x8000],
-                flags = vram[address + 3 - 0x8000];
-            
-            if(x == 0 || x >= 168)
+            WORD sprite_address = sprite_addresses[i];
+            if(sprite_address == NULL_SPRITE_ADDRESS)
                 continue;
 
-            if(get_bit(control, 2)) {
-                tile_index &= 0xFE;
-            } 
+            // assume all sprites at this point are valid (not off screen etc.)
 
-            U32 offset = ly - (y - 16); // ly - (y - 16)
-            U32 h = get_bit(control, 2) ? 16 : 8;
-            if(get_bit(flags, 6)) {
-                offset = h - offset - 1;
+            // https://gbdev.io/pandocs/OAM.html
+            // sprite decoding
+
+            // sprite_y = y position on screen + 16
+            BYTE sprite_y = oam[sprite_address];
+            // sprite_x = x position on screen + 8
+            BYTE sprite_x = oam[sprite_address + 1];
+
+            BYTE tile_id = oam[sprite_address + 2];
+            BYTE sprite_flags = oam[sprite_address + 3];
+
+            // ignore bit 0 for 8x16 objects
+            if(get_bit(control, 2))
+                tile_id &= 0xFE;
+
+            // line of the sprite to render
+            BYTE sprite_line = ly - (sprite_y - 16);
+
+            // handle vertically flipped sprites
+            if(get_bit(sprite_flags, 6)) {
+                sprite_line = (get_bit(control, 2) ? 16 : 8) - sprite_line - 1;
             }
 
-            BYTE line_lsb = vram[0x8000 + tile_index * 16 + offset * 2 - 0x8000];
-            BYTE line_msb = vram[0x8000 + tile_index * 16 + offset * 2 + 1 - 0x8000];
+            BYTE tile_lo = vram[BYTES_PER_TILE * tile_id + BYTES_PER_TILE_LINE * sprite_line];
+            BYTE tile_hi = vram[BYTES_PER_TILE * tile_id + BYTES_PER_TILE_LINE * sprite_line + 1];
 
-            for(int p = 0; p < 8; p++) {
-                if(x + p < 8 || x + p >= 168)
+            for(BYTE sprite_column = 0; sprite_column < 8; sprite_column++) {
+                // get current x position on screen
+                BYTE x = sprite_x + sprite_column;
+                if(x < 8 || x >= 168)
                     continue;
-                int j = get_bit(flags, 5) ? x - 1 - p : x + p - 8;
+                // x = sprite_x - 8
+                x -= 8;
 
-                int k = ((line_msb >> (7 - p) & 0x01) << 1) | (line_lsb >> (7 - p) & 0x01);
+                BYTE column = 7 - sprite_column;
+                // handle horizontally flipped sprites
+                if(get_bit(sprite_flags, 5)) {
+                    column = sprite_column;
+                }
 
-                if( ( get_bit(flags, 7)  && (line[j][1] == 0 && line[j][0] >= 1 && line[j][0] <= 3) ) || 
-                        (line[j][1] == 1 && line[j][3] <= x) || 
-                        k == 0)
+                // 2bpp pixel value
+                BYTE p = (get_bit(tile_hi, column) << 1) | get_bit(tile_lo, column);
+                
+                if(// bit7 bg and window over sprite
+                    (get_bit(sprite_flags, 7) && line[x][1] == 0 && (line[x][0] >= 1 && line[x][1] <= 3)) ||
+                    // pixel is transparent
+                    (p == 0) ||
+                    // same priority x coordinate
+                    (line[x][1] == 1 && sprite_x >= line[x][3])
+                    ) 
                     continue;
+                
+                
+                // store 2bpp pixel value
+                line[x][0] = p;
+                // store 1 for sprite
+                line[x][1] = 1;
+                // store which palette to use
+                line[x][2] = get_bit(sprite_flags, 4);
+                // store sprite_x to compare to other sprites
+                line[x][3] = sprite_x;
 
-                line[j][0] = k;
-                line[j][1] = 1; // 1 for sprite
-                line[j][2] = get_bit(flags, 4);
-                line[j][3] = x;
             }
         }
     }
     
+    // render line onto screen
     for(int x = 0; x < 160; x++) {
         BYTE palette;
         if(line[x][1]) {
@@ -429,7 +467,4 @@ void PPU::write_line() {
 
         video[ly][x] = color[index_to_color[line[x][0]]];
     }
-        
-    // switch mode to H Blank by setting lower 2 bits of lcd status
-    SET_PPU_MODE(ppu_mode::h_blank)
 }
