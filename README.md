@@ -1,59 +1,63 @@
 # Gameboy Emulator
+I've used a bunch of emulators as a kid to play a variety of games from Kirby to Pokemon. It's always
+been a mystery to me how they worked; this project provided good insight into the basic concepts of emulation.
+The emulator is of the Original Gameboy and it currently supports games of ROM ONLY and MBC1 type (e.g. Tetris and Dr. Mario).
 
-## Mar 31
-Start with emulating the CPU
+[Tetris](static/tetris.gif)
 
-## Apr 2
-PPU how to draw lines?
+[DrMario](static/drmario.gif)
 
-Screen
-- 160 x 144 pixels
-- 4 shades of color
-- 8 x 8 pixel tile based, 20 x 18 tiles
-- 40 sprites per line
-- 8 KB VRAM
+## Usage
+**Disclaimer: I haven't made this code portable to other computers yet; as of now, I've only done testing on my macOS. Portability is coming soon** 
+Run `make` to build the gameboy.exe executable. Run `./gameboy.exe <rom_file_path>` to load and run the ROM.
 
-Tile
-- 8 x 8 pixels
-- each pixel can be 4 shades of color
-- 2 bits per pixel
-- bit mapping is in pallete
+[Run](static/run.gif)
 
-Background Tile Data
-- 256 tiles stored in memory
-- 32 x 32 tiles backgorund map
+## May 8, 2023
+I've been working on this Original Gameboy emulator since March 31, 2023. It's developed in C++
+with the help of SDL2 to render the graphics. I've learned a lot about this system as well as C++ quirks.
+I used an Object Oriented approach to organize my system. Each device in the system is a class, and they
+all communicate through the memory management unit (MMU) whenever they need to read from / write to memory
+or other device registers.
 
-Window
+## List of Devices
+#### MMU or Bus
+The MMU connects all the devices together by directing reads and writes on the "bus" to the correct device.
 
+#### CPU
+The CPU interprets the Gameboy instructions from the ROM file loaded into memory to successfuly run the game.
 
-8 KB VRAM Memory Map
-- 4 KB Sprite Tiles
-- 4 KB BG Tiles
-- 1 KB BG Map
-- 1 KB Window Map
-- Overlap addresses for memory map to fit:
-    - LCDC FF40 bit decides the config 
+#### Interrupts
+Interrupts handle various interrupts requested from the different devices (PPU and Timer). Devices can request
+interrupts. When the CPU has interrupts enabled, it handles available interrupts by halting its own instruction execution
+and calling each interrupt's respective function. Interrupts allow devices to "react" to a certain event (e.g. a timer register overflowing).
 
+#### PPU
+The PPU finds the specific color (4 shades in the Original Gameboy) for each of the pixels on the 160 x 144 screen
+by decoding pixel data stored in VRAM. In addition to the screen, I've added a write_tiles function for the emulator
+to be able to render tiles on the side of the screen as well. This was useful when I was debugging my PPU.
 
-Write Per Line
-OAM Search --> Pixel Transfer --> H-Blank
-- CPU can't access VRAM in certain modes
+#### Timer
+The Timer has two internal timers; one timer increments every signal sent by the CPU's clock, while the other
+increments at different frequencies decided by its register. When the second timer overflows, an interrupt is requested,
+allowing the game to "react" to this event.
 
-OAM Search (20 cycles)
-- must decide which sprites visible in **current line**
-- put visible sprites into array of **max 10 sprites**
-- logic for checking is x can't be 0 and current line must be in between sprite's start line and end line
-- CPU can access VRAM
-- CPU can't access OAM RAM
+#### Cartridge
+The Cartridge stores the bytes of the ROM file for the CPU to read from. It also performs Memory Bank
+switching for games that are not ROM only (currently only MBC1).
 
-Pixel Transfer
-- CPU can't access VRAM
-- CPU can't access OAM RAM
-    Pixel FIFO
-    - must contain more than 8 pixels to pop a pixel out
-    - Push and Fetch steps done at the same time
-    - 2 pushes (1 pixel each) per 1 fetch
-    - 3 fetches needed to get tile data
-    - 8 pushes per 3 fetces (3 reads and 1 idle)
+#### Joypad
+The Joypad gets user input from the keyboard and transforms it into bits that can be
+interpretted by other devices so they understand which buttons are pressed.
 
-H Blank
+## Gameboy Tests Passed
+
+#### Blargg Test ROMS -- cpu_instrs/individual
+This passes all of Blargg's cpu_instrs/individual tests [here](https://github.com/retrio/gb-test-roms)
+
+#### Matt Currie's dmg-acid2
+This passes dmg-acid2 PPU test [here](https://github.com/mattcurrie/dmg-acid2)
+
+#### Mooneye MBC1
+This passes some MBC1 tests (haven't implemented more than 32 memory banks yet) [here](https://github.com/Gekkio/mooneye-gb)
+
