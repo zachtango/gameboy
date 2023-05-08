@@ -6,7 +6,6 @@
 #include <iomanip>
 #include <string>
 
-#include <execinfo.h>
 
 const char out_r8(U32 r8) {
     static const char c[] = {'A', 'F', 'B', 'C', 'D', 'E', 'H', 'L'};
@@ -51,7 +50,7 @@ U32 CPU::fetch_decode_execute() {
 
     // fetch
     opcode = mmu.read(PC);
-
+    
     if(debug) {
         if(!prefix_instruction) {
             print_registers();
@@ -86,6 +85,11 @@ U32 CPU::fetch_decode_execute() {
     CPU instructions
     https://rgbds.gbdev.io/docs/v0.6.1/gbz80.7/
 */
+
+U32 CPU::illegal() {
+    std::cerr << "Should not be calling illegal opcode " << std::hex << (int) opcode << '\n';
+    throw "Should not being calling illegal opcode";
+}
 
 // Prefix
 U32 CPU::cb_prefix() {
@@ -244,7 +248,6 @@ void CPU::_add_A_n8(bool carry) {
     // Z0HC
 
     BYTE n8 = mmu.read(PC);
-    // std::cout << std::hex << (int) n8 << '\n';
 
     BYTE sum = _add_8(
         registers.read_8(A),
@@ -290,7 +293,7 @@ void CPU::_sub_A_mHL(bool carry) {
 void CPU::_sub_A_n8(bool carry) {
     // Z1HC
 
-    BYTE n8 = mmu.read(PC); // FIXME get n8 from opcode
+    BYTE n8 = mmu.read(PC);
 
     BYTE diff = _sub_8(
         registers.read_8(A),
@@ -355,7 +358,7 @@ U32 CPU::and_A_r8() {
 
     // Z010
 
-    U32 r8 = _register_8(opcode & 0x07); // get r8 from opcode fIXME
+    U32 r8 = _register_8(opcode & 0x07); 
 
     BYTE a = _and(
         registers.read_8(A),
@@ -391,7 +394,7 @@ U32 CPU::and_A_n8() {
 
     // Z010
 
-    BYTE n8 = mmu.read(PC); // FIXME get n8 from opcode
+    BYTE n8 = mmu.read(PC);
 
     BYTE a = _and(
         registers.read_8(A),
@@ -410,7 +413,7 @@ U32 CPU::cp_A_r8() {
 
     // Z1HC
 
-    U32 r8 = _register_8(opcode & 0x07); // FIXME get r8 from opcode
+    U32 r8 = _register_8(opcode & 0x07);
 
     _sub_8(
         registers.read_8(A),
@@ -444,7 +447,7 @@ U32 CPU::cp_A_n8() {
 
     // Z1HC
 
-    BYTE n8 = mmu.read(PC); // FIXME get n8 from opcode
+    BYTE n8 = mmu.read(PC);
 
     _sub_8(
         registers.read_8(A),
@@ -462,7 +465,7 @@ U32 CPU::dec_r8() {
 
     // ZNH-
 
-    U32 r8 = _register_8((opcode >> 3u) & 0x07); // FIXME get r8 from opcode
+    U32 r8 = _register_8((opcode >> 3u) & 0x07);
 
     BYTE dec = _dec(registers.read_8(r8));
 
@@ -492,11 +495,9 @@ U32 CPU::inc_r8() {
 
     // Z0H-
 
-    U32 r8 = _register_8((opcode >> 3u) & 0x07); // FIXME get r8 from opcode
+    U32 r8 = _register_8((opcode >> 3u) & 0x07);
 
     BYTE inc = _inc(registers.read_8(r8));
-
-    // std::cout << out_r8(r8) << " val: " << std::hex << (int) inc << '\n';
 
     registers.write_8(r8, inc);
 
@@ -524,7 +525,7 @@ U32 CPU::or_A_r8() {
 
     // Z000
 
-    U32 r8 = _register_8(opcode & 0x07); // FIXME get r8 from opcode
+    U32 r8 = _register_8(opcode & 0x07);
 
     BYTE o = _or(
         registers.read_8(A),
@@ -560,7 +561,7 @@ U32 CPU::or_A_n8() {
 
     // Z000
 
-    BYTE n8 = mmu.read(PC); // FIXME get n8 from opcode
+    BYTE n8 = mmu.read(PC);
 
     BYTE o = _or(
         registers.read_8(A),
@@ -639,7 +640,7 @@ U32 CPU::xor_A_r8() {
 
     // Z000
     
-    U32 r8 = _register_8(opcode & 0x07); // FIXME r8
+    U32 r8 = _register_8(opcode & 0x07);
 
     BYTE x = _xor(
         registers.read_8(A),
@@ -659,7 +660,7 @@ U32 CPU::xor_A_mHL() {
     WORD hl = registers.read_16(HL);
 
     BYTE mHL = mmu.read(hl);
-    // std::cout << std::hex << std::setw(2) << std::setfill('0') << (int) mHL << '\n';
+
     BYTE x = _xor(
         registers.read_8(A),
         mHL
@@ -675,7 +676,7 @@ U32 CPU::xor_A_n8() {
 
     // Z000
 
-    BYTE n8 = mmu.read(PC); // FIXME read n8 from opcode
+    BYTE n8 = mmu.read(PC);
 
     BYTE x = _xor(
         registers.read_8(A),
@@ -707,7 +708,7 @@ U32 CPU::add_HL_r16() {
 
     // -0HC
 
-    U32 r16 = _register_16( (opcode >> 4u) & 0x03 ); // FIXME get r16 from opcode
+    U32 r16 = _register_16( (opcode >> 4u) & 0x03 );
 
     WORD sum = _add_16(
         registers.read_16(HL),
@@ -723,7 +724,7 @@ U32 CPU::add_HL_r16() {
 U32 CPU::dec_r16() {
 
     
-    U32 r16 = _register_16( (opcode >> 4u) & 0x03 ); // FIXME get r16 from opcode
+    U32 r16 = _register_16( (opcode >> 4u) & 0x03 );
 
     WORD dec = registers.read_16(r16) - 1;
 
@@ -736,7 +737,7 @@ U32 CPU::dec_r16() {
 U32 CPU::inc_r16() {
 
 
-    U32 r16 = _register_16( (opcode >> 4u) & 0x03 ); // FIXME get r16 from opcode
+    U32 r16 = _register_16( (opcode >> 4u) & 0x03 );
 
     WORD inc = registers.read_16(r16) + 1;
 
@@ -789,9 +790,6 @@ U32 CPU::bit_u3_r8() {
     U32 r8 = _register_8(opcode & 0x07); // GET r8 from opcode
     U32 u3 = (opcode >> 3u) & 0x07; // GET u3 from opcode
 
-    // std::cout << "r8: " << r8 << '\n' <<
-                // "u3: " << u3 << '\n';
-    
     _bit(
         registers.read_8(r8),
         u3
@@ -1348,10 +1346,6 @@ U32 CPU::ld_r8_r8(){
     U32 a_r8 = _register_8((opcode >> 3u) & 0x07);
     U32 b_r8 = _register_8(opcode & 0x07);
 
-    // std::cout << "r8_1: " << out_r8(a_r8) << '\n'
-        // << "r8_2: " << out_r8(b_r8)
-        // << " val: " << (int) registers.read_8(b_r8) << '\n';
-
     registers.write_8(
         a_r8,
         registers.read_8(b_r8)
@@ -1365,9 +1359,6 @@ U32 CPU::ld_r8_n8(){
 
     U32 r8 = _register_8((opcode >> 3u) & 0x07);
     BYTE n8 = mmu.read(PC);
-
-    // std::cout << "r8: " << out_r8(r8) << '\n';
-    // std::cout << "n8: " << std::hex << (int) n8 << '\n';
 
     registers.write_8(
         r8,
@@ -1388,9 +1379,6 @@ U32 CPU::ld_r16_n16(){
         mmu.read(PC)
     );
 
-    // std::cout << "r16: " << out_r16(r16) << '\n';
-    // std::cout << "n16: " << std::hex << (int) n16 << '\n';
-
     registers.write_16(
         r16,
         n16
@@ -1406,9 +1394,8 @@ U32 CPU::ld_mHL_r8(){
 
     WORD hl = registers.read_16(HL);
     
-    // std::cout << "hl: " << std::hex << (int) hl << '\n';
     U32 r8 = _register_8(opcode & 0x07);
-    // std::cout << "r8: " << out_r8(r8) << '\n';
+
     mmu.write(
         hl,
         registers.read_8(r8)
@@ -1443,9 +1430,6 @@ U32 CPU::ld_r8_mHL(){
 
     U32 r8 = _register_8((opcode >> 3u) & 0x07);
 
-    // std::cout << std::hex << out_r8(r8) << " HL: " << (int) hl <<
-    //     " mHL: " << (int) mHL << '\n';
-
     registers.write_8(r8, mHL);
 
     // 8 T Cycles
@@ -1455,13 +1439,11 @@ U32 CPU::ld_r8_mHL(){
 U32 CPU::ld_mr16_A(){
     
     U32 r16 = _register_16( (opcode >> 4u) & 0x03 );
-    // std::cout << "r16: " << out_r16(r16) << '\n'
-        // << "val: " << std::hex << (int) registers.read_16(r16) << '\n';
+
     mmu.write(
         registers.read_16(r16),
         registers.read_8(A)
     );
-    // std::cout << "val: " << std::hex << (int) mmu.read(registers.read_16(r16)) << '\n';
 
     // 8 T Cycles
     return 8;
@@ -1487,9 +1469,6 @@ U32 CPU::ld_mn16_A(){
 
 U32 CPU::ldh_mn16_A(){
 
-    // std::cout << "A: " << std::hex << (int) registers.read_8(A)
-    //     << '\n' << (int) 0xFF00 + mmu.read(PC) << '\n';
-
     BYTE n8 = mmu.read(PC);
 
     mmu.write(
@@ -1504,9 +1483,6 @@ U32 CPU::ldh_mn16_A(){
 }
 
 U32 CPU::ldh_mC_A(){
-    // std::cout << std::hex <<
-        // "Address: " <<
-        // (int) (0xFF00 + registers.read_8(C)) << '\n';
 
     mmu.write(
         0xFF00 + registers.read_8(C),
@@ -1520,8 +1496,6 @@ U32 CPU::ldh_mC_A(){
 U32 CPU::ld_A_mr16(){
 
     U32 r16 = _register_16( (opcode >> 4u) & 0x03 );
-
-    // std::cout << out_r16(r16) << '\n';
 
     registers.write_8(
         A,
@@ -1538,9 +1512,6 @@ U32 CPU::ld_A_mn16(){
         mmu.read(PC + 1),
         mmu.read(PC)
     );
-
-    // std::cout << "n16: " << std::hex << (int) n16 << '\n';
-    // std::cout << "val: " << std::hex << (int) mmu.read(n16) << '\n';
 
     registers.write_8(
         A,
@@ -1597,7 +1568,7 @@ U32 CPU::ld_mHLI_A(){
 U32 CPU::ld_mHLD_A(){
 
     WORD hl = registers.read_16(HL);
-    // std::cout << std::hex << "hl: " << (int) hl << '\n';
+
     mmu.write(
         hl,
         registers.read_8(A)
@@ -1612,8 +1583,7 @@ U32 CPU::ld_mHLD_A(){
 U32 CPU::ld_A_mHLI(){
 
     WORD hl = registers.read_16(HL);
-    // std::cout << "hl: " << std::hex << (int) hl << '\n'
-    //     << "val: " << (int) mmu.read(hl) << '\n';
+
     registers.write_8(
         A,
         mmu.read(hl)
@@ -1658,13 +1628,12 @@ bool CPU::_condition(U32 c) {
 }
 
 void CPU::_call(WORD address) {
-    // std::cout << "call: " << std::hex << (int) address << '\n';
     mmu.write(SP - 1, msb(PC));
 
     mmu.write(SP - 2, lsb(PC));
 
     SP -= 2;
-
+    
     PC = address;
 }
 
@@ -1757,7 +1726,6 @@ U32 CPU::jr_n16() {
 
     SIGNED_BYTE n8 = mmu.read(PC);
 
-    // FIXME signed and unsigend arithmetic?
     PC += n8 + 1;
 
     // 12 T Cycles
@@ -1771,13 +1739,7 @@ U32 CPU::jr_cc_n16() {
 
     bool cc = _condition( (opcode >> 3u) & 0x03 );
     
-    // std::cout << "opcode: " << std::hex << (int) opcode << '\n';
-    // std::cout << "n8: " << std::hex << (int) n8 << '\n';
-    // std::cout << "PC current: " << std::hex << (int) PC << '\n';
-    // std::cout << "PC relative: " << (int) (PC + n8 + 1) << '\n';
-
     if(cc) {
-        // FIXME signed and unsigend arithmetic?
         PC += n8 + 1;
 
         // 12 T Cycles
@@ -2016,8 +1978,6 @@ U32 CPU::push_r16() {
 
     WORD r = registers.read_16(r16);
 
-    // std::cout << std::hex << out_r16(r16) << ": " << (int) r << '\n';
-
     mmu.write(
         SP - 1, 
         msb(r)
@@ -2073,8 +2033,6 @@ U32 CPU::daa() {
 
     // Z-0C
 
-    // FIXME decimal adjust accumulator ??
-
     BYTE a = registers.read_8(A);
 
     bool n = registers.get_n_flag(),
@@ -2117,16 +2075,16 @@ U32 CPU::di() {
 }
 
 U32 CPU::ei() {
-    // std::cout << "Enable Interrupts\n";
+
     // Set IME on next instruction
     enable_interrupt = true;
 
-    // 4 T Cycles FIXME add next instruction cycles
+    // 4 T Cycles
     return 4;
 }
 
 U32 CPU::halt() {
-    // std::cout << "halted\n";
+
     halt_mode = true;
     
     // Wait for interrupt
@@ -2163,7 +2121,7 @@ U32 CPU::stop() {
     return 0;
 }
 
-
+/* INSTRUCTION MAPPINGS */
 void CPU::init_instruction_tables() {
     instruction_map[0x00] = &CPU::nop;
     instruction_map[0x01] = &CPU::ld_r16_n16;
@@ -2389,7 +2347,7 @@ void CPU::init_instruction_tables() {
     instruction_map[0xD0] = &CPU::ret_cc;
     instruction_map[0xD1] = &CPU::pop_r16;
     instruction_map[0xD2] = &CPU::jp_cc_n16;
-    // instruction_map[0xD3] ILLEGAL
+    instruction_map[0xD3] = &CPU::illegal;
     instruction_map[0xD4] = &CPU::call_cc_n16;
     instruction_map[0xD5] = &CPU::push_r16;
     instruction_map[0xD6] = &CPU::sub_A_n8;
@@ -2397,26 +2355,26 @@ void CPU::init_instruction_tables() {
     instruction_map[0xD8] = &CPU::ret_cc;
     instruction_map[0xD9] = &CPU::reti;
     instruction_map[0xDA] = &CPU::jp_cc_n16;
-    // instruction_map[0xDB] ILLEGAL
+    instruction_map[0xDB] = &CPU::illegal;
     instruction_map[0xDC] = &CPU::call_cc_n16;
-    // instruction_map[0xDD] ILLEGAL
+    instruction_map[0xDD] = &CPU::illegal;
     instruction_map[0xDE] = &CPU::sbc_A_n8;
     instruction_map[0xDF] = &CPU::rst;
 
     instruction_map[0xE0] = &CPU::ldh_mn16_A;
     instruction_map[0xE1] = &CPU::pop_r16;
     instruction_map[0xE2] = &CPU::ldh_mC_A;
-    // instruction_map[0xE3] ILLEGAL
-    // instruction_map[0xE4] ILLEGAL
+    instruction_map[0xE3] = &CPU::illegal;
+    instruction_map[0xE4] = &CPU::illegal;
     instruction_map[0xE5] = &CPU::push_r16;
     instruction_map[0xE6] = &CPU::and_A_n8;
     instruction_map[0xE7] = &CPU::rst;
     instruction_map[0xE8] = &CPU::add_SP_e8;
     instruction_map[0xE9] = &CPU::jp_HL;
     instruction_map[0xEA] = &CPU::ld_mn16_A;
-    // instruction_map[0xEB] ILLEGAL
-    // instruction_map[0xEC] ILLEGAL
-    // instruction_map[0xED] ILLEGAL
+    instruction_map[0xEB] = &CPU::illegal;
+    instruction_map[0xEC] = &CPU::illegal;
+    instruction_map[0xED] = &CPU::illegal;
     instruction_map[0xEE] = &CPU::xor_A_n8;
     instruction_map[0xEF] = &CPU::rst;
 
@@ -2424,7 +2382,7 @@ void CPU::init_instruction_tables() {
     instruction_map[0xF1] = &CPU::pop_AF;
     instruction_map[0xF2] = &CPU::ldh_A_mC;
     instruction_map[0xF3] = &CPU::di;
-    // instruction_map[0xF4] ILLEGAL
+    instruction_map[0xF4] = &CPU::illegal;
     instruction_map[0xF5] = &CPU::push_r16;
     instruction_map[0xF6] = &CPU::or_A_n8;
     instruction_map[0xF7] = &CPU::rst;
@@ -2432,8 +2390,8 @@ void CPU::init_instruction_tables() {
     instruction_map[0xF9] = &CPU::ld_SP_HL;
     instruction_map[0xFA] = &CPU::ld_A_mn16;
     instruction_map[0xFB] = &CPU::ei;
-    // instruction_map[0xFC] ILLEGAL
-    // instruction_map[0xFD] ILLEGAL
+    instruction_map[0xFC] = &CPU::illegal;
+    instruction_map[0xFD] = &CPU::illegal;
     instruction_map[0xFE] = &CPU::cp_A_n8;
     instruction_map[0xFF] = &CPU::rst;
 
@@ -2709,3 +2667,4 @@ void CPU::init_instruction_tables() {
     cb_instruction_map[0xFE] = &CPU::set_u3_mHL;
     cb_instruction_map[0xFF] = &CPU::set_u3_r8;
 }
+

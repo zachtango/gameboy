@@ -32,11 +32,15 @@ public:
         scy = 0;
         scx = 0;
         ticks = 0;
+        number_of_sprites = 0;
 
         // set video to black
         for(int i = 0; i < 144; i++)
             for(int j = 0; j < 160; j++)
                 video[i][j] = 0;
+        // set line to black
+        for(int j = 0; j < 160; j++)
+            line[j][0] = 0;
 
         std::cout << "PPU INITALIZED\n";
     }
@@ -50,6 +54,9 @@ public:
 
     /* VIDEO */
     WORD video[144][160];
+
+    // DIMENSIONS USED FOR DEBUGGING
+    // WORD video[192][160 + 4 + 128];
 
 private:
     // holds whether STAT was on last check
@@ -68,10 +75,12 @@ private:
     void v_blank();
 
     /* PPU MODE HELPERS */
+    void print_tile_maps();
     bool is_stat_on();
     bool is_window_visible();
     void write_line();
     void increment_ly();
+    void write_tiles();
     
     // For sending VBLANK and LCD_STAT interrupts
     Interrupts &interrupts;
@@ -89,6 +98,7 @@ private:
 
     // Sprite addresses of 10 Sprites picked from OAM scan
     WORD sprite_addresses[10];
+    BYTE number_of_sprites;
     
     /* contains pixel data of current line
         0: 2 bit pixel value

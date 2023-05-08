@@ -6,8 +6,10 @@ U32 Interrupts::handle_interrupt(CPU &cpu) {
     if(!cpu.interrupt_master_enable)
         return 0;
     
-    BYTE enable_and_flag = interrupt_enable & interrupt_flag;
-    // std::cout << (int) enable_and_flag << '\n';
+    // https://gbdev.io/pandocs/halt.html
+    // only the lower 5 bits are the interrupt bits
+    BYTE enable_and_flag = interrupt_enable & interrupt_flag & 0b00011111;
+    
     // https://gbdev.io/pandocs/Interrupts.html#interrupt-priorities
     // handle in order of priority
     if(enable_and_flag & VBLANK_INTERRUPT) {
@@ -54,6 +56,7 @@ U32 Interrupts::handle_interrupt(CPU &cpu) {
     // disable interrupts
     // https://gbdev.io/pandocs/Interrupts.html
     cpu.interrupt_master_enable = false;
+    cpu.halt_mode = false;
 
     // 20 T Cycles
     return 20;
@@ -68,7 +71,7 @@ void Interrupts::request_interrupt(BYTE interrupt_mask) {
 BYTE Interrupts::read(WORD address) {
     BYTE *p = memory_map(address);
 
-    // bit 8 - 5 unused --> return 1s for those
+    // bit 7 - 5 unused --> return 1s for those
     return *p | (0b11100000);
 }
 void Interrupts::write(WORD address, BYTE value) {
@@ -78,7 +81,7 @@ void Interrupts::write(WORD address, BYTE value) {
 
 /* MEMORY FUNCTIONS HELPER */
 BYTE *Interrupts::memory_map(WORD address) {
-    // std::cout << "address: " << (int) address << '\n';
+
     switch(address) {
         case 0xFFFF:
             // Interrupt enable register

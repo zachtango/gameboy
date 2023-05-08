@@ -2,6 +2,9 @@
 
 /* TICK MASTER LOOP */
 void PPU::tick() {
+    // sends STAT interrupt if needed
+    is_stat_on();
+
     ticks += 1;
     
     switch(status & 0b11) {
@@ -36,8 +39,9 @@ void PPU::write(WORD address, BYTE value) {
     } else if(address == 0xFF41) {
         // status bits 3 - 6 R/W
         status &= 0b10000111;
-        status |= value & 0b01111000;
-        return;
+        value = (status | (value & 0b01111000));
+    } else if(address == 0xFF45) {
+        status = set_bit(status, 2, value == ly);
     }
 
     BYTE *p = memory_map(address);
@@ -61,7 +65,7 @@ BYTE* PPU::memory_map(WORD address) {
         // control
         case 0xFF40:
             return &control;
-
+        
         // status
         case 0xFF41:
             return &status;
@@ -115,9 +119,9 @@ void PPU::oam_scan() {
             - ly >= top of sprite AND ly <= bottom of sprite
     */
     // make sure up to 10 Sprites are stored in sprite_addresses array
-    int counter = 0;
+    number_of_sprites = 0;
     
-    for(WORD address = 0x0000; counter < 10 && address < 0x00A0; address += 4) {
+    for(WORD address = 0x0000; number_of_sprites < 10 && address < 0x00A0; address += 4) {
         // https://gbdev.io/pandocs/OAM.html?highlight=oam%20scan#selection-priority
         // each sprite is 4 bytes
 
@@ -131,18 +135,14 @@ void PPU::oam_scan() {
         // validate Sprite
         if( (y - 16) <= ly && ly < (y - 16 + h) ) {
             // add Sprite to 10 Sprite list
-            sprite_addresses[counter] = address;
-            counter += 1;
+            sprite_addresses[number_of_sprites] = address;
+            number_of_sprites += 1;
         }
-    }
-
-    // set rest of sprite addresses to 0, so we don't render sprites from previous lines
-    for(; counter < 10; counter++) {
-        sprite_addresses[counter] = NULL_SPRITE_ADDRESS;
     }
 
     // switch mode to Pixel Transfer by setting lower 2 bits of lcd status
     SET_PPU_MODE(ppu_mode::pixel_transfer)
+
 }
 
 /* PIXEL TRANSFER
@@ -153,15 +153,19 @@ void PPU::oam_scan() {
 void PPU::pixel_transfer() {
     // Only write pixels to video at end of Pixel Transfer mode
     // Not the most accurate timing, but will work for most GB games
-    if(ticks < 172)
+    // https://forums.nesdev.org/viewtopic.php?t=17754
+    if(ticks < (172 + 10 * number_of_sprites))
         return;
+    
+    // clear bg, sprite buffer
+    for(int i = 0; i < 160; i++)
+        line[i][0] = 0;
 
-    // write line to video at current line (ly)
+    // USED DURING DEBUGGING
+    // print_tile_maps();
+    // write_tiles();
+
     write_line();
-
-    if(get_bit(status, 3)) {
-        interrupts.request_interrupt(LCD_STAT_INTERRUPT);
-    }
 
     // switch mode to H Blank by setting lower 2 bits of lcd status
     SET_PPU_MODE(ppu_mode::h_blank)
@@ -169,7 +173,6 @@ void PPU::pixel_transfer() {
 
 /* H BLANK
     For the current line (ly), wait the number of ticks left
-        FIXME: am I supposed to implement something here?
 */
 void PPU::h_blank() {
     // Wait until end of H Blank mode
@@ -185,10 +188,6 @@ void PPU::h_blank() {
     if(ly == 144) {
         // send v blank interrupt
         interrupts.request_interrupt(VBLANK_INTERRUPT);
-
-        if(get_bit(status, 4)) {
-            interrupts.request_interrupt(LCD_STAT_INTERRUPT);
-        }
 
         // switch mode to V Blank by setting lower 2 bits of lcd status
         SET_PPU_MODE(ppu_mode::v_blank)
@@ -222,15 +221,11 @@ void PPU::v_blank() {
 
 /* PPU MODE HELPERS */
 bool PPU::is_stat_on() {
-    // holds mask to AND with STAT
-    // check LYC=LY flag first
-    BYTE mask = get_bit(status, 2) ? 1 << 6 : 0;
-
-    // (1 << ((status & 0b11) + 3)) gets mode based mask --> AND with 0b0111000 to not include mode 3
-    mask |= ((1 << ((status & 0b11) + 3)) & 0b0111000); 
-
-    // mask AND status register
-    bool stat_on = mask & status;
+    // logically ORs all stat sources
+    bool stat_on = (get_bit(status, 6) && get_bit(status, 2)) ||
+                    (get_bit(status, 5) && ((status && 0b11) == ppu_mode::oam_scan)) ||
+                    (get_bit(status, 4) && ((status && 0b11) == ppu_mode::v_blank)) ||
+                    (get_bit(status, 3) && ((status && 0b11) == ppu_mode::h_blank));
 
     // send STAT interrupt when going from low to high
     if(!previous_stat_on && stat_on) {
@@ -280,8 +275,59 @@ void PPU::increment_ly() {
     // set LYC=LY flag (bit 2 of status)
     status = set_bit(status, 2, lyc == ly);
 
-    if(lyc == ly && get_bit(status, 6)) {
-        interrupts.request_interrupt(LCD_STAT_INTERRUPT);
+    is_stat_on();
+}
+
+void PPU::print_tile_maps() {
+    // https://gbdev.io/pandocs/Tile_Maps.html
+    // 9800 - 9BFF 32 x 32 tile map
+    std::cout << "\n0x9800 - 0x9BFF Tile Map\n";
+    int counter = 0;
+    for(WORD address = 0x9800; address < 0x9C00; address++, counter++) {
+        if((counter % 32) == 0) {
+            std::cout << '\n';
+        }
+        std::cout << std::hex << (int) vram[address - 0x8000] << ' ';
+    }
+    std::cout << '\n';
+
+    // 9C00 - 9FFF 32 x 32 tile map
+    std::cout << "\n0x9C00 - 0x9FFF Tile Map\n";
+    for(WORD address = 0x9C00; address <= 0x9FFF; address++, counter++) {
+        if((counter % 32) == 0) {
+            std::cout << '\n';
+        }
+        std::cout << std::hex << (int) vram[address - 0x8000] << ' ';
+    }
+}
+
+void PPU::write_tiles() {
+
+    int x = 0, y = 0;
+    for(WORD address = 0x0000; address < 0x1800; address += BYTES_PER_TILE) {
+        for(int i = 0; i < 8; i++) {
+            BYTE tile_lo = vram[address + 2 * i];
+            BYTE tile_hi = vram[address + 2 * i + 1];
+            
+            for(int p = 0; p < 8; p++) {
+                BYTE pixel_value = (get_bit(tile_hi, (7 - p)) << 1) | get_bit(tile_lo, (7 - p));
+                
+                // palette mappings from index to color
+                int index_to_color[4] {
+                    (bg_palette) & 0x03,
+                    (bg_palette >> 2) & 0x03,
+                    (bg_palette >> 4) & 0x03,
+                    (bg_palette >> 6) & 0x03,
+                };
+
+                video[y + i][164 + x + p] = color[index_to_color[pixel_value]];
+            }
+        }
+        x += 8;
+        if(x == 128) {
+            y += 8;
+            x = 0;
+        }
     }
 }
 
@@ -320,8 +366,7 @@ void PPU::write_line() {
 
                 tile_column = (x + 7 - wx) % 8;
                 tile_line = window_ly % 8;
-            } else 
-            {
+            } else {
                 // get background tilemap address start (bit 3 of control decides 9C00 vs 9800)
                 tile_map_address = get_bit(control, 3) ? 0x9C00 : 0x9800;
 
@@ -364,6 +409,9 @@ void PPU::write_line() {
                 line[x][0] = (get_bit(tile_hi, (7 - tile_column)) << 1) | get_bit(tile_lo, (7 - tile_column));
                 // store 0 for background and window
                 line[x][1] = 0;
+
+                // if(!(is_window_visible() && (x + 7) >= wx))
+                //     line[x][0] = 0;
             }
         }
     }
@@ -373,7 +421,7 @@ void PPU::write_line() {
     // handle sprites
     if(get_bit(control, 1)) {
         // render sprites
-        for(int i = 0; i < 10; i++) {
+        for(int i = 0; i < number_of_sprites; i++) {
             WORD sprite_address = sprite_addresses[i];
             if(sprite_address == NULL_SPRITE_ADDRESS)
                 continue;
@@ -459,10 +507,10 @@ void PPU::write_line() {
         
         // palette mappings from index to color
         int index_to_color[4] {
-            (palette) & 0b11,
-            (palette >> 2) & 0b11,
-            (palette >> 4) & 0b11,
-            (palette >> 6) & 0b11,
+            (palette) & 0x03,
+            (palette >> 2) & 0x03,
+            (palette >> 4) & 0x03,
+            (palette >> 6) & 0x03,
         };
 
         video[ly][x] = color[index_to_color[line[x][0]]];

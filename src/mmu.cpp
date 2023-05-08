@@ -10,7 +10,7 @@
 #include "interrupts.h"
 
 BYTE MMU::read(WORD address) {
-    // std::cout << "read: " << (int) address << '\n';
+
     // MEMORY MAP
     // https://gbdev.io/pandocs/Memory_Map.html?highlight=wram#memory-map
 
@@ -159,15 +159,14 @@ BYTE MMU::read(WORD address) {
 }
 
 void MMU::write(WORD address, BYTE value) {
-    
+
     // MEMORY MAP
     // https://gbdev.io/pandocs/Memory_Map.html?highlight=wram#memory-map
 
     // 0x0000 - 0x3FFF bank0
     // 0x4000 - 0x7FFF bank1
     if(address < 0x8000) {
-        std::cerr << "Should not be writing to ROM (Read Only Memory)\n";
-        return;
+        cartridge.write(address, value);
     }
 
     // 0x8000 - 0x9FFF VRAM
@@ -181,7 +180,7 @@ void MMU::write(WORD address, BYTE value) {
     // 0xC000 - 0xDFFF WRAM
     else if(address < 0xE000)
         wram[address - 0xC000] = value;
-
+    
     // 0xE000 - 0xFDFF Mirror of 0xC000 - 0xDDFF, Prohibited area by Nintendo
     else if(address < 0xFE00)
         wram[address - 0xFE00] = value;

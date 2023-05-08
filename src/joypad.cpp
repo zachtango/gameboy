@@ -7,35 +7,27 @@
 void Joypad::key_action(U32 key, bool pressed) {
     switch(key) {
         case START_INPUT:
-            std::cout << "start pressed\n";
             start = pressed;
             break;
         case SELECT_INPUT:
-            std::cout << "select pressed\n";
             select = pressed;
             break;
         case B_INPUT:
-            std::cout << "b pressed\n";
             b = pressed;
             break;
         case A_INPUT:
-            std::cout << "a pressed\n";
             a = pressed;
             break;
         case DOWN_INPUT:
-            std::cout << "down pressed\n";
             down = pressed;
             break;
         case UP_INPUT:
-            std::cout << "up pressed\n";
             up = pressed;
             break;
         case LEFT_INPUT:
-            std::cout << "left pressed\n";
             left = pressed;
             break;
         case RIGHT_INPUT:
-            std::cout << "right pressed\n";
             right = pressed;
             break;
         default:

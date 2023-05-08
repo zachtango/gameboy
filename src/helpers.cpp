@@ -26,7 +26,3 @@ BYTE set_bit(BYTE b, U32 bit, bool on) {
     
     return b;
 }
-
-void print_byte(BYTE b) {
-    std::cout << std::hex << (int) b;
-}

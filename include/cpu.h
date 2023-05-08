@@ -217,6 +217,8 @@ private:
         CPU INSTRUCTIONS
         https://rgbds.gbdev.io/docs/v0.6.1/gbz80.7/
     */
+    U32 illegal();
+
     // Prefix
     U32 cb_prefix();
 
@@ -390,7 +392,7 @@ private:
     U32 stop();
 };
 
-
+/* INSTRUCTION MAPPINGS */
 static const char *INSTRUCTION_NAME_MAP[0x100] {
     [0x00] = "nop;",
     [0x01] = "ld_r16_n16;",
