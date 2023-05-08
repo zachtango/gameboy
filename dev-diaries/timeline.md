@@ -25,6 +25,7 @@ April 24 - April 30
     by changing MMU to direct reads/writes to specific devices rather than storing one big
     internal memory array, so much easier to manage
 - defined Joypad to handle user input
+- defined Timer for "reacts" to timer oveflows
 - defined Cartridge to handle loading ROMs
 - defined MBC1 ROMs for Cartridge
 - tested MBC1 ROMs with Mooneye MBC1 tests
