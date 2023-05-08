@@ -3,15 +3,15 @@ I've used a bunch of emulators as a kid to play a variety of games from Kirby to
 been a mystery to me how they worked; this project provided good insight into the basic concepts of emulation.
 The emulator is of the Original Gameboy and it currently supports games of ROM ONLY and MBC1 type (e.g. Tetris and Dr. Mario).
 
-[Tetris](static/tetris.gif)
+![Tetris](static/tetris.gif)
 
-[DrMario](static/drmario.gif)
+![DrMario](static/drmario.gif)
 
 ## Usage
 **Disclaimer: I haven't made this code portable to other computers yet; as of now, I've only done testing on my macOS. Portability is coming soon** 
 Run `make` to build the gameboy.exe executable. Run `./gameboy.exe <rom_file_path>` to load and run the ROM.
 
-[Run](static/run.gif)
+![Run](static/run.gif)
 
 ## May 8, 2023
 I've been working on this Original Gameboy emulator since March 31, 2023. It's developed in C++
