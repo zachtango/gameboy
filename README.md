@@ -8,7 +8,8 @@ The emulator is of the Original Gameboy and it currently supports games of ROM O
 ![DrMario](static/drmario.gif)
 
 ## Usage
-**Disclaimer: I haven't made this code portable to other computers yet; as of now, I've only done testing on my macOS. Portability is coming soon** 
+**Disclaimer: I haven't made this code portable to other computers yet; as of now, I've only done testing on my macOS. Portability is coming soon**
+
 Run `make` to build the gameboy.exe executable. Run `./gameboy.exe <rom_file_path>` to load and run the ROM.
 
 ![Run](static/run.gif)
